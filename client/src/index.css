@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 240 10% 93%; /* #eeeeee */
+  --foreground: 215 25% 27%; /* #1F2937 */
+  --muted: 210 11% 98%; /* #F9FAFB */
+  --muted-foreground: 215 16% 47%; /* #6B7280 */
+  --popover: 0 0% 100%; /* #FFFFFF */
+  --popover-foreground: 215 25% 27%; /* #1F2937 */
+  --card: 0 0% 100%; /* #FFFFFF */
+  --card-foreground: 215 25% 27%; /* #1F2937 */
+  --border: 214 13% 91%; /* #E5E7EB */
+  --input: 214 13% 91%; /* #E5E7EB */
+  --primary: 207 90% 40%; /* #0070cc */
+  --primary-foreground: 210 100% 98%; /* #F8FAFC */
+  --secondary: 207 100% 26%; /* #004984 */
+  --secondary-foreground: 210 100% 98%; /* #F8FAFC */
+  --accent: 84 61% 45%; /* #78c021 */
+  --accent-foreground: 210 100% 98%; /* #F8FAFC */
+  --destructive: 0 84% 60%; /* #EF4444 */
+  --destructive-foreground: 210 100% 98%; /* #F8FAFC */
+  --ring: 207 90% 40%; /* #0070cc */
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 224 71% 4%; /* #0F172A */
+  --foreground: 213 31% 91%; /* #E2E8F0 */
+  --muted: 223 47% 11%; /* #1E293B */
+  --muted-foreground: 215 20% 65%; /* #94A3B8 */
+  --popover: 224 71% 4%; /* #0F172A */
+  --popover-foreground: 213 31% 91%; /* #E2E8F0 */
+  --card: 224 71% 4%; /* #0F172A */
+  --card-foreground: 213 31% 91%; /* #E2E8F0 */
+  --border: 223 47% 11%; /* #1E293B */
+  --input: 223 47% 11%; /* #1E293B */
+  --primary: 207 90% 40%; /* #0070cc */
+  --primary-foreground: 210 100% 98%; /* #F8FAFC */
+  --secondary: 207 100% 26%; /* #004984 */
+  --secondary-foreground: 210 100% 98%; /* #F8FAFC */
+  --accent: 84 61% 45%; /* #78c021 */
+  --accent-foreground: 210 100% 98%; /* #F8FAFC */
+  --destructive: 0 63% 31%; /* #7F1D1D */
+  --destructive-foreground: 213 31% 91%; /* #E2E8F0 */
+  --ring: 207 90% 40%; /* #0070cc */
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold;
+  }
+}
+
+@layer components {
+  .cla-logo {
+    @apply w-10 h-10 bg-gradient-to-br from-blue-200 to-primary rounded-full flex items-center justify-center;
+  }
+
+  .cla-logo-text {
+    @apply text-white font-bold text-lg;
+  }
+
+  .btn-primary {
+    @apply bg-primary hover:bg-secondary text-primary-foreground font-medium transition-colors;
+  }
+
+  .btn-accent {
+    @apply bg-accent hover:bg-accent/90 text-accent-foreground font-medium transition-colors;
+  }
+
+  .status-active {
+    @apply bg-green-50 text-green-700 border-green-200;
+  }
+
+  .status-renewal-needed {
+    @apply bg-amber-50 text-amber-700 border-amber-200;
+  }
+
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-md hover:border-primary/20;
+  }
+}
