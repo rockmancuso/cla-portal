@@ -17,6 +17,30 @@ export default function Header({ user, onEditProfile }: HeaderProps) {
   const { toast } = useToast();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const displayFullName = (
+    user &&
+    user.firstName &&
+    user.firstName.length > 0 &&
+    user.lastName &&
+    user.lastName.length > 0
+  )
+    ? `${user.firstName} ${user.lastName}`
+    : "Guest User";
+
+  const displayCompanyName = (user && user.companyName)
+    ? user.companyName
+    : "";
+
+  const displayInitials = (
+    user &&
+    user.firstName &&
+    user.firstName.length > 0 &&
+    user.lastName &&
+    user.lastName.length > 0
+  )
+    ? `${user.firstName[0]}${user.lastName[0]}`
+    : "GU";
+
   const handleLogout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout");
@@ -77,15 +101,15 @@ export default function Header({ user, onEditProfile }: HeaderProps) {
           <div className="flex items-center space-x-4">
             <div className="hidden md:block text-right">
               <p className="text-sm font-medium text-foreground">
-                {user.firstName} {user.lastName}
+                {displayFullName}
               </p>
               <p className="text-xs text-muted-foreground">
-                {user.companyName}
+                {displayCompanyName}
               </p>
             </div>
             <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
               <span className="text-white text-sm font-medium">
-                {user.firstName[0]}{user.lastName[0]}
+                {displayInitials}
               </span>
             </div>
             <Button
@@ -109,14 +133,14 @@ export default function Header({ user, onEditProfile }: HeaderProps) {
                   <div className="text-center pb-4 border-b border-border">
                     <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-3">
                       <span className="text-white text-xl font-medium">
-                        {user.firstName[0]}{user.lastName[0]}
+                        {displayInitials}
                       </span>
                     </div>
                     <p className="font-medium text-foreground">
-                      {user.firstName} {user.lastName}
+                      {displayFullName}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {user.companyName}
+                      {displayCompanyName}
                     </p>
                   </div>
                   

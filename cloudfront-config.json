@@ -1,0 +1,40 @@
+{
+  "CallerReference": "your-app-cdn-$(date +%s)",
+  "Comment": "CDN for cla-member-portal",
+  "Enabled": true,
+  "DefaultRootObject": "index.html",
+  "Origins": {
+    "Quantity": 1,
+    "Items": [
+      {
+        "Id": "S3-cla-member-portal",
+        "DomainName": "cla-member-portal.s3.amazonaws.com",
+        "S3OriginConfig": {
+          "OriginAccessIdentity": "origin-access-identity/cloudfront/EAIKMAADFW734"
+        }
+      }
+    ]
+  },
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "S3-cla-member-portal",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": {
+      "Quantity": 2,
+      "Items": ["GET", "HEAD"],
+      "CachedMethods": {
+        "Quantity": 2,
+        "Items": ["GET", "HEAD"]
+      }
+    },
+    "Compress": true,
+    "MinTTL": 0,
+    "DefaultTTL": 86400, 
+    "MaxTTL": 31536000, 
+    "ForwardedValues": {
+      "QueryString": false,
+      "Cookies": { "Forward": "none" }
+    }
+  },
+  "PriceClass": "PriceClass_100",
+  "HttpVersion": "http2"
+}

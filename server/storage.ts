@@ -33,6 +33,8 @@ export interface IStorage {
   getUpcomingEvents(): Promise<Event[]>;
   getEvent(id: number): Promise<Event | undefined>;
   createEvent(event: InsertEvent): Promise<Event>;
+  updateEvent(id: number, updates: Partial<InsertEvent>): Promise<Event | undefined>;
+  getEventByEventbriteId(eventbriteId: string): Promise<Event | undefined>;
 
   // Event registration methods
   getEventRegistrationsByUserId(userId: number): Promise<(EventRegistration & { event: Event })[]>;
@@ -81,6 +83,9 @@ export class MemStorage implements IStorage {
       lastName: 'Johnson',
       phone: '(555) 123-4567',
       hubspotContactId: 'hubspot_contact_123',
+      hubspotUserId: null,
+      hubspotAccessToken: null,
+      hubspotRefreshToken: null,
       companyName: 'Clean Pro Laundromats',
       companySector: 'Commercial Laundry',
       locationCount: 12,
@@ -194,10 +199,20 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
-    const user: User = { 
-      ...insertUser, 
+    const user: User = {
       id,
-      createdAt: new Date()
+      email: insertUser.email,
+      firstName: insertUser.firstName,
+      lastName: insertUser.lastName,
+      phone: insertUser.phone ?? null,
+      hubspotContactId: insertUser.hubspotContactId ?? null,
+      hubspotUserId: insertUser.hubspotUserId ?? null,
+      hubspotAccessToken: insertUser.hubspotAccessToken ?? null,
+      hubspotRefreshToken: insertUser.hubspotRefreshToken ?? null,
+      companyName: insertUser.companyName ?? null,
+      companySector: insertUser.companySector ?? null,
+      locationCount: insertUser.locationCount ?? null,
+      createdAt: new Date(),
     };
     this.users.set(id, user);
     return user;
@@ -218,7 +233,16 @@ export class MemStorage implements IStorage {
 
   async createMembership(insertMembership: InsertMembership): Promise<Membership> {
     const id = this.currentMembershipId++;
-    const membership: Membership = { ...insertMembership, id };
+    const membership: Membership = {
+      id,
+      userId: insertMembership.userId,
+      membershipId: insertMembership.membershipId,
+      type: insertMembership.type,
+      status: insertMembership.status,
+      joinDate: insertMembership.joinDate,
+      expiryDate: insertMembership.expiryDate,
+      hubspotDealId: insertMembership.hubspotDealId ?? null,
+    };
     this.memberships.set(id, membership);
     return membership;
   }
@@ -249,11 +273,53 @@ export class MemStorage implements IStorage {
 
   async createEvent(insertEvent: InsertEvent): Promise<Event> {
     const id = this.currentEventId++;
-    const event: Event = { ...insertEvent, id };
+    const event: Event = {
+      id,
+      eventbriteId: insertEvent.eventbriteId,
+      title: insertEvent.title,
+      description: insertEvent.description ?? null,
+      startDate: insertEvent.startDate,
+      endDate: insertEvent.endDate ?? null,
+      location: insertEvent.location ?? null,
+      isVirtual: insertEvent.isVirtual ?? false,
+      price: insertEvent.price ?? null,
+      maxAttendees: insertEvent.maxAttendees ?? null,
+    };
     this.events.set(id, event);
     return event;
   }
 
+  async updateEvent(id: number, updates: Partial<InsertEvent>): Promise<Event | undefined> {
+    const event = this.events.get(id);
+    if (!event) return undefined;
+
+    // Merge existing event data with updates
+    // Ensure all fields from Event are considered, and optional fields from InsertEvent are handled
+    const updatedEvent: Event = {
+      ...event,
+      ...updates,
+      // Ensure fields that might be null in InsertEvent but not in Event (if applicable) are handled
+      // For example, if 'description' could be null in updates but shouldn't overwrite a non-null existing description unless explicitly set to null
+      description: updates.description !== undefined ? updates.description : event.description,
+      endDate: updates.endDate !== undefined ? updates.endDate : event.endDate,
+      location: updates.location !== undefined ? updates.location : event.location,
+      isVirtual: updates.isVirtual !== undefined ? updates.isVirtual : event.isVirtual,
+      price: updates.price !== undefined ? updates.price : event.price,
+      maxAttendees: updates.maxAttendees !== undefined ? updates.maxAttendees : event.maxAttendees,
+    };
+    this.events.set(id, updatedEvent);
+    return updatedEvent;
+  }
+
+  async getEventByEventbriteId(eventbriteId: string): Promise<Event | undefined> {
+    for (const event of Array.from(this.events.values())) {
+      if (event.eventbriteId === eventbriteId) {
+        return event;
+      }
+    }
+    return undefined;
+  }
+ 
   async getEventRegistrationsByUserId(userId: number): Promise<(EventRegistration & { event: Event })[]> {
     const userRegistrations = Array.from(this.eventRegistrations.values())
       .filter(registration => registration.userId === userId);
@@ -266,10 +332,13 @@ export class MemStorage implements IStorage {
 
   async createEventRegistration(insertRegistration: InsertEventRegistration): Promise<EventRegistration> {
     const id = this.currentRegistrationId++;
-    const registration: EventRegistration = { 
-      ...insertRegistration, 
+    const registration: EventRegistration = {
       id,
-      registrationDate: new Date()
+      userId: insertRegistration.userId,
+      eventId: insertRegistration.eventId,
+      ticketNumber: insertRegistration.ticketNumber,
+      registrationDate: new Date(),
+      eventbriteOrderId: insertRegistration.eventbriteOrderId ?? null,
     };
     this.eventRegistrations.set(id, registration);
     return registration;
@@ -289,10 +358,12 @@ export class MemStorage implements IStorage {
 
   async createActivity(insertActivity: InsertActivity): Promise<Activity> {
     const id = this.currentActivityId++;
-    const activity: Activity = { 
-      ...insertActivity, 
+    const activity: Activity = {
       id,
-      createdAt: new Date()
+      userId: insertActivity.userId,
+      type: insertActivity.type,
+      description: insertActivity.description,
+      createdAt: new Date(),
     };
     this.activities.set(id, activity);
     return activity;

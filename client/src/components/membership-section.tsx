@@ -4,44 +4,133 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { 
-  CreditCard, 
-  AlertTriangle, 
-  Edit, 
-  Download, 
+import {
+  CreditCard,
+  AlertTriangle,
+  Edit,
+  Download,
   Gift,
   Crown,
   Calendar,
   Clock,
-  CheckCircle
+  CheckCircle,
+  Loader2, // For loading state
+  ServerCrash // For error state
 } from "lucide-react";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getHubSpotDashboardData, type HubSpotDashboardData } from "@/lib/api";
 import type { User, Membership } from "@shared/schema";
+import { Skeleton } from "@/components/ui/skeleton"; // For loading skeletons
 
 interface MembershipSectionProps {
-  user: User;
+  user: User; // Keep user prop for now, might contain other relevant info
+  // membership prop might be deprecated or used as fallback if HubSpot data fails
   membership?: Membership & { daysUntilExpiry?: number; renewalNeeded?: boolean };
   onEditProfile: () => void;
 }
 
-export default function MembershipSection({ user, membership, onEditProfile }: MembershipSectionProps) {
+export default function MembershipSection({ user, membership: initialMembership, onEditProfile }: MembershipSectionProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    companyName: user.companyName || '',
-    companySector: user.companySector || '',
-    locationCount: user.locationCount || 0,
-    phone: user.phone || '',
+  
+  const { data: hubSpotData, isLoading: isLoadingHubSpot, error: hubSpotError } = useQuery<HubSpotDashboardData, Error>({
+    queryKey: ['hubspotDashboardData', user.id], // Include user.id in queryKey if data is user-specific
+    queryFn: getHubSpotDashboardData,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  // TODO: The existing formData for company info editing might need to be updated
+  // if companyName is now coming from HubSpot. For now, it uses user.companyName.
+  // This part of the component (editing company info) is outside the scope of HubSpot data display.
+  const [formData, setFormData] = useState({
+    companyName: hubSpotData?.company?.name || user.companyName || '',
+    companySector: user.companySector || '', // This might also come from HubSpot if needed
+    locationCount: user.locationCount || 0, // This might also come from HubSpot if needed
+    phone: user.phone || '', // This might also come from HubSpot if needed
+  });
+  
+  // Update formData when hubSpotData is available
+  // Corrected: Was useState, should be useEffect. And added react-hooks/exhaustive-deps comment.
+  React.useEffect(() => {
+    if (hubSpotData?.company?.name) {
+      setFormData(prev => ({ ...prev, companyName: hubSpotData.company!.name! }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hubSpotData?.company?.name]);
+
+
   const handleSave = () => {
-    // TODO: Implement save functionality
+    // TODO: Implement save functionality - this is outside HubSpot scope for now
     setIsEditing(false);
   };
 
   const handleRenewal = () => {
-    // TODO: Implement renewal process
+    // TODO: Implement renewal process - this is outside HubSpot scope for now
     console.log("Starting renewal process...");
   };
+
+  const formatDate = (dateString?: string | null, options?: Intl.DateTimeFormatOptions) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', options || { month: 'long', day: 'numeric', year: 'numeric' });
+    } catch (e) {
+      return 'Invalid Date';
+    }
+  };
+  
+  if (isLoadingHubSpot) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center text-xl font-semibold text-secondary">
+            <CreditCard className="h-5 w-5 text-primary mr-3" />
+            My Membership
+            <Loader2 className="h-5 w-5 animate-spin ml-3" />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6 space-y-4">
+          <Skeleton className="h-8 w-1/2" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+          <Skeleton className="h-8 w-1/3 mt-6" />
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (hubSpotError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center text-xl font-semibold text-destructive">
+            <ServerCrash className="h-5 w-5 text-destructive mr-3" />
+            Error Loading Membership
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Could not load your membership details from HubSpot. Please try again later.
+              {hubSpotError.message && <p className="text-xs mt-1">Details: {hubSpotError.message}</p>}
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  // Use initialMembership for renewal notice as HubSpot data might not have this specific logic yet
+  const renewalNeeded = initialMembership?.renewalNeeded;
+  const daysUntilExpiry = initialMembership?.daysUntilExpiry;
 
   return (
     <Card>
@@ -50,19 +139,19 @@ export default function MembershipSection({ user, membership, onEditProfile }: M
           <CreditCard className="h-5 w-5 text-primary mr-3" />
           My Membership
           <Badge className="ml-3 bg-green-50 text-green-700 border-green-200">
-            {membership?.status || 'Active'}
+            {hubSpotData?.contact?.member_status || initialMembership?.status || 'N/A'}
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6">
-        {/* Renewal Notice */}
-        {membership?.renewalNeeded && (
+        {/* Renewal Notice - using initialMembership data for now */}
+        {renewalNeeded && (
           <Alert className="mb-6 border-amber-200 bg-amber-50">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
             <AlertDescription className="text-amber-700">
               <div className="font-medium mb-1">Renewal Reminder</div>
               <p className="text-sm mb-3">
-                Your membership expires in {membership.daysUntilExpiry} days. 
+                Your membership expires in {daysUntilExpiry} days.
                 Renew now to continue enjoying all member benefits.
               </p>
               <Button onClick={handleRenewal} className="btn-accent">
@@ -72,14 +161,14 @@ export default function MembershipSection({ user, membership, onEditProfile }: M
           </Alert>
         )}
 
-        {/* Membership Status Cards */}
+        {/* Membership Status Cards - Using HubSpot Data */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div className="bg-muted rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Membership Type</p>
                 <p className="font-semibold text-secondary">
-                  {membership?.type || 'Professional Plus'}
+                  {hubSpotData?.contact?.membership_type || 'N/A'}
                 </p>
               </div>
               <Crown className="h-5 w-5 text-accent" />
@@ -91,13 +180,7 @@ export default function MembershipSection({ user, membership, onEditProfile }: M
               <div>
                 <p className="text-sm text-muted-foreground">Member Since</p>
                 <p className="font-semibold text-secondary">
-                  {membership?.joinDate ? 
-                    new Date(membership.joinDate).toLocaleDateString('en-US', { 
-                      month: 'long', 
-                      year: 'numeric' 
-                    }) : 
-                    'March 2019'
-                  }
+                  {formatDate(hubSpotData?.contact?.activated_date__c, { month: 'long', year: 'numeric' })}
                 </p>
               </div>
               <Calendar className="h-5 w-5 text-primary" />
@@ -107,9 +190,9 @@ export default function MembershipSection({ user, membership, onEditProfile }: M
           <div className="bg-muted rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Current Period</p>
+                <p className="text-sm text-muted-foreground">Current Term Start Date</p>
                 <p className="font-semibold text-secondary">
-                  Jan 2024 - Dec 2024
+                  {formatDate(hubSpotData?.contact?.current_term_start_date__c)}
                 </p>
               </div>
               <Clock className="h-5 w-5 text-primary" />
@@ -121,14 +204,7 @@ export default function MembershipSection({ user, membership, onEditProfile }: M
               <div>
                 <p className="text-sm text-muted-foreground">Paid Through</p>
                 <p className="font-semibold text-secondary">
-                  {membership?.expiryDate ? 
-                    new Date(membership.expiryDate).toLocaleDateString('en-US', { 
-                      month: 'long', 
-                      day: 'numeric', 
-                      year: 'numeric' 
-                    }) : 
-                    'December 31, 2024'
-                  }
+                  {formatDate(hubSpotData?.contact?.membership_paid_through__c)}
                 </p>
               </div>
               <CheckCircle className="h-5 w-5 text-accent" />
@@ -136,12 +212,13 @@ export default function MembershipSection({ user, membership, onEditProfile }: M
           </div>
         </div>
 
-        {/* Company Information Section */}
+        {/* Company Information Section - Using HubSpot Data for display */}
+        {/* The editing part of company info is kept as is, using formData state */}
         <div className="border-t border-border pt-6">
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-semibold text-secondary">Company Information</h4>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => setIsEditing(!isEditing)}
             >
@@ -153,40 +230,44 @@ export default function MembershipSection({ user, membership, onEditProfile }: M
           {isEditing ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label className="text-sm font-medium text-muted-foreground mb-2">
+                <Label htmlFor="companyName" className="text-sm font-medium text-muted-foreground mb-2">
                   Company Name
                 </Label>
-                <Input 
+                <Input
+                  id="companyName"
                   value={formData.companyName}
                   onChange={(e) => setFormData({...formData, companyName: e.target.value})}
                   className="focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
               <div>
-                <Label className="text-sm font-medium text-muted-foreground mb-2">
+                <Label htmlFor="phone" className="text-sm font-medium text-muted-foreground mb-2">
                   Phone Number
                 </Label>
-                <Input 
+                <Input
+                  id="phone"
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
                   className="focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
               <div>
-                <Label className="text-sm font-medium text-muted-foreground mb-2">
+                <Label htmlFor="companySector" className="text-sm font-medium text-muted-foreground mb-2">
                   Industry Sector
                 </Label>
-                <Input 
+                <Input
+                  id="companySector"
                   value={formData.companySector}
                   onChange={(e) => setFormData({...formData, companySector: e.target.value})}
                   className="focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
               <div>
-                <Label className="text-sm font-medium text-muted-foreground mb-2">
+                <Label htmlFor="locationCount" className="text-sm font-medium text-muted-foreground mb-2">
                   Number of Locations
                 </Label>
-                <Input 
+                <Input
+                  id="locationCount"
                   type="number"
                   value={formData.locationCount}
                   onChange={(e) => setFormData({...formData, locationCount: parseInt(e.target.value)})}
@@ -206,52 +287,50 @@ export default function MembershipSection({ user, membership, onEditProfile }: M
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h5 className="text-sm font-medium text-muted-foreground mb-3">
-                  Member Information
+                  Member Information (from HubSpot)
                 </h5>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs text-muted-foreground">Member ID</label>
+                    <label className="text-xs text-muted-foreground">Member ID (from profile)</label>
                     <p className="text-sm font-medium">
-                      {membership?.membershipId || 'CLA-2020-0847'}
+                      {initialMembership?.membershipId || user.id /* Fallback to user.id or similar */}
                     </p>
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">Membership Type</label>
+                    <label className="text-xs text-muted-foreground">Membership Type (Contact)</label>
                     <p className="text-sm font-medium">
-                      {membership?.type || 'Professional'}
+                      {hubSpotData?.contact?.membership_type || 'N/A'}
                     </p>
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">Join Date</label>
+                    <label className="text-xs text-muted-foreground">Member Since (Activated Date)</label>
                     <p className="text-sm font-medium">
-                      {membership?.joinDate ? 
-                        new Date(membership.joinDate).toLocaleDateString('en-US', { 
-                          month: 'long', 
-                          day: 'numeric', 
-                          year: 'numeric' 
-                        }) : 
-                        'January 15, 2020'
-                      }
+                      {formatDate(hubSpotData?.contact?.activated_date__c)}
                     </p>
                   </div>
                 </div>
               </div>
               <div>
                 <h5 className="text-sm font-medium text-muted-foreground mb-3">
-                  Company Information
+                  Company Information (from HubSpot)
                 </h5>
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs text-muted-foreground">Company Name</label>
-                    <p className="text-sm font-medium">{user.companyName}</p>
+                    <p className="text-sm font-medium">{hubSpotData?.company?.name || 'N/A'}</p>
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">Industry Sector</label>
-                    <p className="text-sm font-medium">{user.companySector}</p>
+                    <label className="text-xs text-muted-foreground">Company Membership Type</label>
+                    <p className="text-sm font-medium">{hubSpotData?.company?.membership_type || 'N/A'}</p>
+                  </div>
+                  {/* These fields are not in the current HubSpot fetch, using user prop as fallback */}
+                  <div>
+                    <label className="text-xs text-muted-foreground">Industry Sector (from profile)</label>
+                    <p className="text-sm font-medium">{user.companySector || 'N/A'}</p>
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">Locations</label>
-                    <p className="text-sm font-medium">{user.locationCount} Locations</p>
+                    <label className="text-xs text-muted-foreground">Locations (from profile)</label>
+                    <p className="text-sm font-medium">{user.locationCount ? `${user.locationCount} Locations` : 'N/A'}</p>
                   </div>
                 </div>
               </div>
@@ -280,3 +359,6 @@ export default function MembershipSection({ user, membership, onEditProfile }: M
     </Card>
   );
 }
+
+// Need to import React for React.useEffect
+import React from 'react';

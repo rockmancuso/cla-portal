@@ -7,27 +7,45 @@ import ProfileEditModal from "@/components/profile-edit-modal";
 import { Card, CardContent } from "@/components/ui/card";
 import { CalendarDays, CheckCircle, Users, Clock } from "lucide-react";
 import { useState } from "react";
+import { getHubSpotDashboardData, type HubSpotDashboardData, getUserProfile, getMembership, getActivities } from "@/lib/api"; // Import HubSpot fetch function and type
 
 export default function Dashboard() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-  const { data: profileData } = useQuery({
-    queryKey: ["/api/user/profile"],
+  const { data: profileData, isLoading: isLoadingProfile } = useQuery<Awaited<ReturnType<typeof getUserProfile>>>({ // Add type for user
+    queryKey: ["userProfile"], // Keep a descriptive queryKey
+    queryFn: getUserProfile,
   });
 
-  const { data: membershipData } = useQuery({
-    queryKey: ["/api/membership"],
+  // Keep existing membership fetch for potential renewal logic or other non-HubSpot data
+  const { data: legacyMembershipData, isLoading: isLoadingLegacyMembership } = useQuery<Awaited<ReturnType<typeof getMembership>>>({
+    queryKey: ["legacyMembership"], // Keep a descriptive queryKey
+    queryFn: getMembership,
   });
 
-  const { data: activitiesData } = useQuery({
-    queryKey: ["/api/activities"],
+  const { data: activitiesData, isLoading: isLoadingActivities } = useQuery<Awaited<ReturnType<typeof getActivities>>>({
+    queryKey: ["activities"], // Keep a descriptive queryKey
+    queryFn: getActivities,
   });
-
+  
   const user = profileData?.user;
-  const membership = membershipData?.membership;
-  const activities = activitiesData?.activities || [];
 
-  if (!user) {
+  // Fetch HubSpot data for Quick Stats
+  const { data: hubSpotData, isLoading: isLoadingHubSpotDashboard } = useQuery<HubSpotDashboardData, Error>({
+    queryKey: ['hubspotDashboardData', user?.id], // Query key includes user.id
+    queryFn: getHubSpotDashboardData,
+    enabled: !!user?.id, // Only run query if user.id is available
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  const legacyMembership = legacyMembershipData?.membership ? {
+    ...legacyMembershipData.membership,
+    daysUntilExpiry: legacyMembershipData.membership.daysUntilExpiry === null ? undefined : legacyMembershipData.membership.daysUntilExpiry,
+  } : undefined; // This is passed to MembershipSection for renewal notice
+  const activities = activitiesData?.activities || [];
+ 
+ 
+  if (isLoadingProfile || !user) { // Check for user existence here after isLoadingProfile
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -39,6 +57,15 @@ export default function Dashboard() {
       </div>
     );
   }
+  
+  const formatDate = (dateString?: string | null, options?: Intl.DateTimeFormatOptions) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', options || { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) {
+      return 'Invalid Date';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -48,14 +75,14 @@ export default function Dashboard() {
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">
-            Welcome back, {user.firstName}!
+            Welcome back, {user?.firstName || 'Guest'}!
           </h1>
           <p className="text-muted-foreground">
             Manage your membership, events, and profile from your personalized dashboard.
           </p>
         </div>
 
-        {/* Quick Stats */}
+        {/* Quick Stats - Updated with HubSpot Data */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="card-hover">
             <CardContent className="p-6">
@@ -66,7 +93,7 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Membership Status</p>
                   <p className="text-lg font-semibold text-green-600">
-                    {membership?.status || 'Active'}
+                    {isLoadingHubSpotDashboard ? 'Loading...' : hubSpotData?.contact?.member_status || 'N/A'}
                   </p>
                 </div>
               </div>
@@ -80,16 +107,9 @@ export default function Dashboard() {
                   <CalendarDays className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Valid Through</p>
+                  <p className="text-sm font-medium text-muted-foreground">Paid Through</p>
                   <p className="text-lg font-semibold text-foreground">
-                    {membership?.expiryDate ? 
-                      new Date(membership.expiryDate).toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        day: 'numeric', 
-                        year: 'numeric' 
-                      }) : 
-                      'Dec 31, 2024'
-                    }
+                    {isLoadingHubSpotDashboard ? 'Loading...' : formatDate(hubSpotData?.contact?.membership_paid_through__c)}
                   </p>
                 </div>
               </div>
@@ -100,11 +120,14 @@ export default function Dashboard() {
             <CardContent className="p-6">
               <div className="flex items-center">
                 <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
+                  {/* Using Current Term Start Date from HubSpot for one of the date fields */}
                   <CalendarDays className="h-6 w-6 text-purple-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Upcoming Events</p>
-                  <p className="text-lg font-semibold text-foreground">3</p>
+                  <p className="text-sm font-medium text-muted-foreground">Current Term Start</p>
+                  <p className="text-lg font-semibold text-foreground">
+                     {isLoadingHubSpotDashboard ? 'Loading...' : formatDate(hubSpotData?.contact?.current_term_start_date__c)}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -119,13 +142,7 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Member Since</p>
                   <p className="text-lg font-semibold text-foreground">
-                    {membership?.joinDate ? 
-                      new Date(membership.joinDate).toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        year: 'numeric' 
-                      }) : 
-                      'Jan 2020'
-                    }
+                    {isLoadingHubSpotDashboard ? 'Loading...' : formatDate(hubSpotData?.contact?.activated_date__c, { month: 'short', year: 'numeric' })}
                   </p>
                 </div>
               </div>
@@ -137,9 +154,9 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Membership */}
           <div className="lg:col-span-2">
-            <MembershipSection 
-              user={user} 
-              membership={membership}
+            <MembershipSection
+              user={user}
+              membership={legacyMembership} // Pass legacyMembership as initialMembership for renewal notice
               onEditProfile={() => setIsProfileModalOpen(true)}
             />
           </div>
