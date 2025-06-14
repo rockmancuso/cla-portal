@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/header";
+import NavigationMenu from "@/components/navigation-menu";
 import MembershipSection from "@/components/membership-section";
 import EventsSection from "@/components/events-section";
 import QuickActions from "@/components/quick-actions";
@@ -9,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDays, CheckCircle, Users, Clock, Award, Bell, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { getHubSpotDashboardData, type HubSpotDashboardData, getUserProfile, getMembership, getActivities } from "@/lib/api";
+import { displayValue, displayValueWithFallback } from "@/lib/utils";
 
 export default function Dashboard() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -63,16 +65,19 @@ export default function Dashboard() {
   }
   
   const formatDate = (dateString?: string | null, options?: Intl.DateTimeFormatOptions) => {
-    if (!dateString) return 'N/A';
+    if (!dateString || dateString === 'null' || dateString === 'undefined') return '';
     try {
       return new Date(dateString).toLocaleDateString('en-US', options || { month: 'short', day: 'numeric', year: 'numeric' });
     } catch (e) {
-      return 'Invalid Date';
+      return '';
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+      {/* Navigation Menu */}
+      <NavigationMenu />
+      
       {/* Enhanced Header with Gradient */}
       <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 text-white">
         <div className="max-w-7xl mx-auto px-6 py-8">
@@ -120,7 +125,7 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm font-medium text-green-700 cla-body">Membership Status</p>
                   <p className="text-xl font-bold text-green-800 cla-heading">
-                    {isLoadingHubSpotDashboard ? 'Loading...' : hubSpotData?.contact?.member_status || 'N/A'}
+                    {isLoadingHubSpotDashboard ? 'Loading...' : displayValue(hubSpotData?.contact?.member_status)}
                   </p>
                 </div>
               </div>

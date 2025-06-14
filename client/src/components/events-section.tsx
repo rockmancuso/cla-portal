@@ -97,7 +97,23 @@ export default function EventsSection() {
   const internalEvents = internalEventsData?.events || [];
   // const registrations = registrationsData?.registrations || []; // Replaced by myEventbriteRegisteredEvents
   const myRegisteredEvents = myEventbriteRegistrationsData?.events || [];
-  const upcomingEventbriteEvents = eventbriteEventsData?.events || [];
+  
+  // Filter events by date - show only upcoming events within the next 2 months
+  const filterUpcomingEvents = (events: EventbriteEventData[]) => {
+    const now = new Date();
+    const twoMonthsFromNow = new Date();
+    twoMonthsFromNow.setMonth(now.getMonth() + 4);
+    
+    return events.filter(event => {
+      if (!event.startDate) return false;
+      const eventDate = new Date(event.startDate);
+      return eventDate >= now && eventDate <= twoMonthsFromNow;
+    });
+  };
+  
+  const filteredUpcomingEvents = filterUpcomingEvents(eventbriteEventsData?.events || []);
+  // Limit to 12 events for better UX (3 rows of 4 or 4 rows of 3)
+  const upcomingEventbriteEvents = filteredUpcomingEvents.slice(0, 12);
 
 
   const handleRegister = (eventId: number) => { // For internal events (if still used elsewhere)
@@ -223,9 +239,8 @@ export default function EventsSection() {
                     {/* Link to Eventbrite event page if URL is available */}
                     {(event.url || (event as any).eventbriteId) && ( // (event as any).eventbriteId for constructing URL if event.url is missing
                       <Button
-                        variant="outline"
                         size="sm"
-                        className="mt-3 w-full text-xs"
+                        className="mt-3 w-full text-xs font-medium bg-accent hover:bg-accent/90 text-accent-foreground transition-colors"
                         onClick={() => window.open(event.url || `https://www.eventbrite.com/e/${(event as any).eventbriteId}`, "_blank")}
                       >
                         View on Eventbrite <ExternalLink className="h-3 w-3 ml-2" />
@@ -245,7 +260,7 @@ export default function EventsSection() {
         {/* Upcoming Events from Eventbrite (General) */}
         <div>
           <h4 className="font-semibold text-muted-foreground mb-3">
-            Upcoming Events from Eventbrite
+            Upcoming Events (Next 2 Months)
           </h4>
           {isLoadingEventbriteEvents && (
             <div className="space-y-4">
@@ -272,64 +287,59 @@ export default function EventsSection() {
           {!isLoadingEventbriteEvents && !eventbriteEventsError && (
             <div className="space-y-4">
               {upcomingEventbriteEvents.length > 0 ? (
-                upcomingEventbriteEvents.map((event: EventbriteEventData) => (
-                  <div
-                    key={event.id}
-                    className="border border-border rounded-lg p-4"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-sm font-medium text-foreground line-clamp-2">
-                        {event.name}
-                      </h3>
-                      {event.isFree !== undefined && (
-                        <Badge
-                          className={`ml-2 flex-shrink-0 ${
-                            event.isFree
-                              ? "bg-green-100 text-green-800 border-green-200"
-                              : "bg-orange-100 text-orange-800 border-orange-200" // Example for paid
-                          }`}
+                <>
+                  {filteredUpcomingEvents.length > 12 && (
+                    <div className="text-xs text-muted-foreground mb-4 p-3 bg-muted rounded-lg">
+                      Showing {upcomingEventbriteEvents.length} of {filteredUpcomingEvents.length} upcoming events in the next 2 months.
+                    </div>
+                  )}
+                  {upcomingEventbriteEvents.map((event: EventbriteEventData) => (
+                    <div
+                      key={event.id}
+                      className="border border-border rounded-lg p-4"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="text-sm font-medium text-foreground line-clamp-2">
+                          {event.name}
+                        </h3>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="flex items-center">
+                          <CalendarDays className="h-3 w-3 mr-2" />
+                          {formatDateForDisplay(event.startDate)}
+                          {event.endDate && event.endDate !== event.startDate && ` - ${formatDateForDisplay(event.endDate)}`}
+                        </div>
+                        <div className="flex items-center">
+                          {event.location?.toLowerCase() === "online" ? (
+                            <Globe className="h-3 w-3 mr-2" />
+                          ) : (
+                            <MapPin className="h-3 w-3 mr-2" />
+                          )}
+                          {event.venueName && event.location?.toLowerCase() !== "online"
+                            ? `${event.venueName} - ${event.location}`
+                            : event.location || "Location TBD"}
+                        </div>
+                      </div>
+                      {event.description && (
+                        <p className="!text-xs text-muted-foreground mt-2 line-clamp-3">
+                          {event.description}
+                        </p>
+                      )}
+                      {event.url && (
+                        <Button
+                          size="sm"
+                          className="mt-3 w-full text-xs font-medium bg-accent hover:bg-accent/90 text-accent-foreground transition-colors"
+                          onClick={() => window.open(event.url, "_blank")}
                         >
-                          {formatPriceDisplayForEventbrite(event)}
-                        </Badge>
+                          View on Eventbrite <ExternalLink className="h-3 w-3 ml-2" />
+                        </Button>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      <div className="flex items-center">
-                        <CalendarDays className="h-3 w-3 mr-2" />
-                        {formatDateForDisplay(event.startDate)}
-                        {event.endDate && event.endDate !== event.startDate && ` - ${formatDateForDisplay(event.endDate)}`}
-                      </div>
-                      <div className="flex items-center">
-                        {event.location?.toLowerCase() === "online" ? (
-                          <Globe className="h-3 w-3 mr-2" />
-                        ) : (
-                          <MapPin className="h-3 w-3 mr-2" />
-                        )}
-                        {event.venueName && event.location?.toLowerCase() !== "online"
-                          ? `${event.venueName} - ${event.location}`
-                          : event.location || "Location TBD"}
-                      </div>
-                    </div>
-                    {event.description && (
-                      <p className="text-xs text-muted-foreground mt-2 line-clamp-3">
-                        {event.description}
-                      </p>
-                    )}
-                    {event.url && (
-                       <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-3 w-full text-xs font-medium transition-colors btn-accent"
-                        onClick={() => window.open(event.url, "_blank")}
-                      >
-                        View on Eventbrite <ExternalLink className="h-3 w-3 ml-2" />
-                      </Button>
-                    )}
-                  </div>
-                ))
+                  ))}
+                </>
               ) : (
-                 <p className="text-muted-foreground text-center py-8">
-                  No upcoming events found on Eventbrite at the moment.
+                <p className="text-muted-foreground text-center py-8">
+                  No upcoming events found in the next 2 months.
                 </p>
               )}
             </div>

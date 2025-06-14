@@ -22,6 +22,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getHubSpotDashboardData, type HubSpotDashboardData } from "@/lib/api";
 import type { User, Membership } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton"; // For loading skeletons
+import { displayValue, displayValueWithFallback } from "@/lib/utils";
 
 interface MembershipSectionProps {
   user: User; // Keep user prop for now, might contain other relevant info
@@ -70,11 +71,11 @@ export default function MembershipSection({ user, membership: initialMembership,
   };
 
   const formatDate = (dateString?: string | null, options?: Intl.DateTimeFormatOptions) => {
-    if (!dateString) return 'N/A';
+    if (!dateString || dateString === 'null' || dateString === 'undefined') return '';
     try {
       return new Date(dateString).toLocaleDateString('en-US', options || { month: 'long', day: 'numeric', year: 'numeric' });
     } catch (e) {
-      return 'Invalid Date';
+      return '';
     }
   };
   
@@ -139,7 +140,7 @@ export default function MembershipSection({ user, membership: initialMembership,
           <CreditCard className="h-5 w-5 text-primary mr-3" />
           My Membership
           <Badge className="ml-3 bg-green-50 text-green-700 border-green-200">
-            {hubSpotData?.contact?.member_status || initialMembership?.status || 'N/A'}
+            {displayValue(hubSpotData?.contact?.member_status) || displayValue(initialMembership?.status)}
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -168,7 +169,7 @@ export default function MembershipSection({ user, membership: initialMembership,
               <div>
                 <p className="text-sm text-muted-foreground">Membership Type</p>
                 <p className="font-semibold text-secondary">
-                  {hubSpotData?.contact?.membership_type || 'N/A'}
+                  {displayValue(hubSpotData?.contact?.membership_type)}
                 </p>
               </div>
               <Crown className="h-5 w-5 text-accent" />
@@ -299,7 +300,7 @@ export default function MembershipSection({ user, membership: initialMembership,
                   <div>
                     <label className="text-xs text-muted-foreground">Membership Type (Contact)</label>
                     <p className="text-sm font-medium">
-                      {hubSpotData?.contact?.membership_type || 'N/A'}
+                      {displayValue(hubSpotData?.contact?.membership_type)}
                     </p>
                   </div>
                   <div>
@@ -317,20 +318,20 @@ export default function MembershipSection({ user, membership: initialMembership,
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs text-muted-foreground">Company Name</label>
-                    <p className="text-sm font-medium">{hubSpotData?.company?.name || 'N/A'}</p>
+                    <p className="text-sm font-medium">{displayValue(hubSpotData?.company?.name)}</p>
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground">Company Membership Type</label>
-                    <p className="text-sm font-medium">{hubSpotData?.company?.membership_type || 'N/A'}</p>
+                    <p className="text-sm font-medium">{displayValue(hubSpotData?.company?.membership_type)}</p>
                   </div>
                   {/* These fields are not in the current HubSpot fetch, using user prop as fallback */}
                   <div>
                     <label className="text-xs text-muted-foreground">Industry Sector (from profile)</label>
-                    <p className="text-sm font-medium">{user.companySector || 'N/A'}</p>
+                    <p className="text-sm font-medium">{displayValue(user.companySector)}</p>
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground">Locations (from profile)</label>
-                    <p className="text-sm font-medium">{user.locationCount ? `${user.locationCount} Locations` : 'N/A'}</p>
+                    <p className="text-sm font-medium">{user.locationCount ? `${user.locationCount} Locations` : ''}</p>
                   </div>
                 </div>
               </div>

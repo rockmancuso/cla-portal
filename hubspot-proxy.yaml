@@ -1,0 +1,170 @@
+# Fixed CloudFormation template with Lambda for reliable CORS
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'API Gateway with Lambda for HubSpot proxy - fixes CORS issues'
+
+Parameters:
+  HubSpotAccessToken:
+    Type: String
+    Description: Your HubSpot Private App Access Token
+    NoEcho: true
+
+Resources:
+  # Lambda execution role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function
+  HubSpotProxyLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: hubspot-proxy
+      Runtime: nodejs18.x
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          HUBSPOT_ACCESS_TOKEN: !Ref HubSpotAccessToken
+      Code:
+        ZipFile: |
+          const https = require('https');
+          
+          exports.handler = async (event) => {
+              const corsHeaders = {
+                  'Access-Control-Allow-Origin': '*',
+                  'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
+              };
+          
+              if (event.httpMethod === 'OPTIONS') {
+                  return {
+                      statusCode: 200,
+                      headers: corsHeaders,
+                      body: ''
+                  };
+              }
+          
+              try {
+                  const hubspotPath = event.pathParameters?.proxy || '';
+                  const hubspotAccessToken = process.env.HUBSPOT_ACCESS_TOKEN;
+                  
+                  let fullUrl = `https://api.hubapi.com/${hubspotPath}`;
+                  if (event.queryStringParameters) {
+                      const queryString = new URLSearchParams(event.queryStringParameters).toString();
+                      fullUrl += `?${queryString}`;
+                  }
+          
+                  const response = await makeHttpRequest(fullUrl, {
+                      method: event.httpMethod,
+                      headers: {
+                          'Authorization': `Bearer ${hubspotAccessToken}`,
+                          'Content-Type': 'application/json'
+                      }
+                  }, event.body);
+          
+                  return {
+                      statusCode: response.statusCode,
+                      headers: {
+                          ...corsHeaders,
+                          'Content-Type': 'application/json'
+                      },
+                      body: response.body
+                  };
+          
+              } catch (error) {
+                  console.error('Error:', error);
+                  return {
+                      statusCode: 500,
+                      headers: corsHeaders,
+                      body: JSON.stringify({ error: 'Internal server error' })
+                  };
+              }
+          };
+          
+          function makeHttpRequest(url, options, body) {
+              return new Promise((resolve, reject) => {
+                  const urlObj = new URL(url);
+                  const requestOptions = {
+                      hostname: urlObj.hostname,
+                      port: 443,
+                      path: urlObj.pathname + urlObj.search,
+                      method: options.method,
+                      headers: options.headers
+                  };
+          
+                  const req = https.request(requestOptions, (res) => {
+                      let responseBody = '';
+                      res.on('data', (chunk) => responseBody += chunk);
+                      res.on('end', () => resolve({
+                          statusCode: res.statusCode,
+                          body: responseBody
+                      }));
+                  });
+          
+                  req.on('error', reject);
+                  if (body) req.write(body);
+                  req.end();
+              });
+          }
+
+  # API Gateway
+  HubSpotAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: hubspot-lambda-proxy
+      EndpointConfiguration:
+        Types: [REGIONAL]
+
+  # Proxy resource
+  ProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref HubSpotAPI
+      ParentId: !GetAtt HubSpotAPI.RootResourceId
+      PathPart: '{proxy+}'
+
+  # Lambda permission
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref HubSpotProxyLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HubSpotAPI}/*/*"
+
+  # Proxy method
+  ProxyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref HubSpotAPI
+      ResourceId: !Ref ProxyResource
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${HubSpotProxyLambda.Arn}/invocations"
+
+  # Deployment
+  Deployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: ProxyMethod
+    Properties:
+      RestApiId: !Ref HubSpotAPI
+      StageName: prod
+
+Outputs:
+  ProxyURL:
+    Description: Use this URL in your frontend code
+    Value: !Sub "https://${HubSpotAPI}.execute-api.${AWS::Region}.amazonaws.com/prod"
