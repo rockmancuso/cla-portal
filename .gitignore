@@ -1,3 +1,4 @@
 node_modules
 .env
 (OUTDATED) cla-codebase-summary.txt
+dist

@@ -109,8 +109,12 @@
 
   #react-app-root p {
     font-family: var(--font-primary) !important; /* Figtree for body text */
-    font-size: 1rem !important;
+    font-size: 1rem;
     line-height: 1.5 !important;
+  }
+
+  p {
+    padding-bottom: initial !important;
   }
 
   /* Reset button styles that might be inherited from HubSpot */
