@@ -2,3 +2,6 @@ node_modules
 .env
 (OUTDATED) cla-codebase-summary.txt
 dist
+hubspot.config.yaml
+client/src/.DS_Store
+client/.DS_Store

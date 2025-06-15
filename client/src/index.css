@@ -61,60 +61,51 @@
     font-family: var(--font-primary) !important; /* Figtree for body text */
   }
 
-  /* Headers use aktiv-grotesk */
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold;
     font-family: var(--font-secondary) !important; /* aktiv-grotesk for headers */
   }
 
-  /* Buttons use figtree */
   button {
     font-family: var(--font-primary) !important; /* Figtree for buttons */
   }
 
-  /* HubSpot CSS Isolation - Protect React app from inherited styles */
+  /* ADDED: HubSpot CSS Isolation */
   #react-app-root {
-    /* Reset font inheritance from HubSpot site - use CLA fonts */
-    font-family: var(--font-primary) !important; /* Figtree for body */
+    font-family: var(--font-primary) !important;
     font-size: 16px !important;
     line-height: 1.5 !important;
-    
-    /* Reset other potential inherited styles */
     color: hsl(var(--foreground)) !important;
     background: transparent;
-    
-    /* Create isolation boundary */
     position: relative;
     z-index: 1;
   }
 
-  /* Force reset on all children to prevent cascade issues */
   #react-app-root *,
   #react-app-root *::before,
   #react-app-root *::after {
     box-sizing: border-box;
   }
 
-  /* Ensure CLA typography takes precedence over HubSpot styles */
-  #react-app-root h1,
-  #react-app-root h2,
-  #react-app-root h3,
-  #react-app-root h4,
-  #react-app-root h5,
-  #react-app-root h6 {
-    font-family: var(--font-secondary) !important; /* aktiv-grotesk for headers */
+  #react-app-root h1, #react-app-root h2, #react-app-root h3, #react-app-root h4, #react-app-root h5, #react-app-root h6 {
+    font-family: var(--font-secondary) !important;
     font-weight: 600 !important;
     line-height: 1.2 !important;
   }
 
   #react-app-root p {
-    font-family: var(--font-primary) !important; /* Figtree for body text */
-    font-size: 1rem;
-    line-height: 1.5 !important;
+    font-family: var(--font-primary) !important;
+    /* line-height: 1.5; */
   }
-
+  
+  /* HubSpot adds a specific padding-bottom to all <p> tags */
   p {
     padding-bottom: initial !important;
+  }
+
+
+  .hidden {
+    visibility: initial !important;
   }
 
   /* Reset button styles that might be inherited from HubSpot */

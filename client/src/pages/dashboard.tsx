@@ -122,7 +122,7 @@ export default function Dashboard() {
                 <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
                   <CheckCircle className="w-6 h-6 text-white" />
                 </div>
-                <div>
+                <div className="pl-1">
                   <p className="text-sm font-medium text-green-700 cla-body">Membership Status</p>
                   <p className="text-xl font-bold text-green-800 cla-heading">
                     {isLoadingHubSpotDashboard ? 'Loading...' : displayValue(hubSpotData?.contact?.member_status)}
@@ -138,7 +138,7 @@ export default function Dashboard() {
                 <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
                   <CalendarDays className="w-6 h-6 text-white" />
                 </div>
-                <div>
+                <div className="pl-1">
                   <p className="text-sm font-medium text-blue-700 cla-body">Paid Through</p>
                   <p className="text-xl font-bold text-blue-800 cla-heading">
                     {isLoadingHubSpotDashboard ? 'Loading...' : formatDate(hubSpotData?.contact?.membership_paid_through__c)}
@@ -154,7 +154,7 @@ export default function Dashboard() {
                 <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
                   <CalendarDays className="w-6 h-6 text-white" />
                 </div>
-                <div>
+                <div className="pl-1">
                   <p className="text-sm font-medium text-purple-700 cla-body">Current Term Start</p>
                   <p className="text-xl font-bold text-purple-800 cla-heading">
                     {isLoadingHubSpotDashboard ? 'Loading...' : formatDate(hubSpotData?.contact?.current_term_start_date__c)}
@@ -170,7 +170,7 @@ export default function Dashboard() {
                 <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center">
                   <Users className="w-6 h-6 text-white" />
                 </div>
-                <div>
+                <div className="pl-1">
                   <p className="text-sm font-medium text-orange-700 cla-body">Member Since</p>
                   <p className="text-xl font-bold text-orange-800 cla-heading">
                     {isLoadingHubSpotDashboard ? 'Loading...' : formatDate(hubSpotData?.contact?.activated_date__c, { month: 'short', year: 'numeric' })}
