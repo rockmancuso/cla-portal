@@ -11,6 +11,7 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       colors: {
+        'cla-blue': '#0a6fc2',
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {

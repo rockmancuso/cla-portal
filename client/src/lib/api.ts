@@ -440,6 +440,18 @@ export async function getAuthMe() {
   // Use the available HubSpot data to simulate auth response
   const hubspotData = (window as any).hubspotPageData;
   
+  // In development, provide mock data
+  if (process.env.NODE_ENV === 'development') {
+    return {
+      user: {
+        id: 1,
+        email: 'demo@example.com',
+        firstName: 'Demo',
+        lastName: 'User',
+      }
+    };
+  }
+  
   // Check if we have valid HubSpot data (user is authenticated)
   if (!hubspotData || !hubspotData.memberEmail || hubspotData.memberEmail === 'not_available') {
     throw new Error('Not authenticated');

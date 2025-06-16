@@ -8,45 +8,84 @@ import ProfileEditModal from "@/components/profile-edit-modal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, CheckCircle, Users, Clock, Award, Bell, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getHubSpotDashboardData, type HubSpotDashboardData, getUserProfile, getMembership, getActivities } from "@/lib/api";
 import { displayValue, displayValueWithFallback } from "@/lib/utils";
+import { useAuth } from '@/hooks/use-auth';
 
 export default function Dashboard() {
+  const { user: authUser, isLoading: isLoadingAuth, isAuthenticated } = useAuth();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
+  // All queries must be declared at the top level, regardless of auth state
   const { data: profileData, isLoading: isLoadingProfile } = useQuery<Awaited<ReturnType<typeof getUserProfile>>>({
     queryKey: ["userProfile"],
     queryFn: getUserProfile,
+    enabled: isAuthenticated, // Only fetch profile if authenticated
   });
 
-  // Keep existing membership fetch for potential renewal logic or other non-HubSpot data
   const { data: legacyMembershipData, isLoading: isLoadingLegacyMembership } = useQuery<Awaited<ReturnType<typeof getMembership>>>({
     queryKey: ["legacyMembership"],
     queryFn: getMembership,
+    enabled: isAuthenticated, // Only fetch membership if authenticated
   });
 
   const { data: activitiesData, isLoading: isLoadingActivities } = useQuery<Awaited<ReturnType<typeof getActivities>>>({
     queryKey: ["activities"],
     queryFn: getActivities,
+    enabled: isAuthenticated, // Only fetch activities if authenticated
   });
-  
-  const user = profileData?.user;
 
-  // Fetch HubSpot data for Quick Stats
+  const user = profileData?.user || authUser; // Fallback to authUser if profile data isn't loaded yet
+
   const { data: hubSpotData, isLoading: isLoadingHubSpotDashboard } = useQuery<HubSpotDashboardData, Error>({
     queryKey: ['hubspotDashboardData', user?.id],
     queryFn: getHubSpotDashboardData,
-    enabled: !!user?.id,
+    enabled: !!user?.id && isAuthenticated, // Only fetch HubSpot data if we have a user ID and are authenticated
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Redirect if not authenticated (except in development)
+  useEffect(() => {
+    // Only redirect after auth check is complete and we're not authenticated
+    if (!isLoadingAuth && !isAuthenticated) {
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      if (!isDevelopment) {
+        const returnUrl = encodeURIComponent(window.location.href);
+        window.location.href = `https://member.laundryassociation.org/_hcms/mem/login?redirect_url=${returnUrl}`;
+      }
+    }
+  }, [isLoadingAuth, isAuthenticated]);
+
+  // Show loading state while checking auth
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-200 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-white font-bold text-xl cla-heading">CLA</span>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2 cla-heading">Loading CLA Member Portal...</h2>
+          <p className="text-gray-600 cla-body">Please wait while we load your personalized experience.</p>
+          <div className="mt-4">
+            <div className="inline-block w-6 h-6 border-3 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show nothing if not authenticated (except in development)
+  if (!isAuthenticated && process.env.NODE_ENV !== 'development') {
+    return null;
+  }
 
   const legacyMembership = legacyMembershipData?.membership ? {
     ...legacyMembershipData.membership,
     daysUntilExpiry: legacyMembershipData.membership.daysUntilExpiry === null ? undefined : legacyMembershipData.membership.daysUntilExpiry,
   } : undefined;
   const activities = activitiesData?.activities || [];
- 
+  
   if (isLoadingProfile || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">

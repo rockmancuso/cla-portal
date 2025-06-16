@@ -37,8 +37,9 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
     address: user.address || '',
     addressLine2: user.addressLine2 || '',
     city: user.city || '',
-    country: user.country || '',
+    country: user.country || 'United States',
     state: user.state || '',
+    province: user.province || '',
     postalCode: user.postalCode || '',
   });
 
@@ -85,15 +86,16 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const showStateField = formData.country === 'Canada';
+  const showStateField = formData.country === 'United States';
+  const showProvinceField = formData.country === 'Canada';
   const showCountryField = !['United States', 'Canada'].includes(formData.country);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-foreground">
-            Edit Profile
+          <DialogTitle className="text-xl font-semibold text-foreground relative after:content-[''] after:block after:w-full after:h-0.5 after:bg-gray-300 tracking-medium after:mt-2 uppercase">
+            Edit My Profile
           </DialogTitle>
         </DialogHeader>
         
@@ -107,7 +109,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
                 id="firstName"
                 value={formData.firstName}
                 onChange={(e) => handleInputChange('firstName', e.target.value)}
-                className="focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
                 required
               />
             </div>
@@ -119,7 +121,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
                 id="lastName"
                 value={formData.lastName}
                 onChange={(e) => handleInputChange('lastName', e.target.value)}
-                className="focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
                 required
               />
             </div>
@@ -134,13 +136,16 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
                 value={formData.individualType} 
                 onValueChange={(value) => handleInputChange('individualType', value)}
               >
-                <SelectTrigger className="focus:ring-2 focus:ring-primary focus:border-transparent">
+                <SelectTrigger className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Owner">Owner</SelectItem>
-                  <SelectItem value="Manager">Manager</SelectItem>
-                  <SelectItem value="Employee">Employee</SelectItem>
+                  <SelectItem value="Store Owner">Store Owner</SelectItem>
+                  <SelectItem value="Potential Investor">Potential Investor</SelectItem>
+                  <SelectItem value="Store Employee">Store Employee</SelectItem>
+                  <SelectItem value="Distributor">Distributor</SelectItem>
+                  <SelectItem value="Manufacturer">Manufacturer</SelectItem>
+                  <SelectItem value="Service Provider">Service Provider</SelectItem>
                   <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
@@ -153,7 +158,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
                 value={formData.contactType} 
                 onValueChange={(value) => handleInputChange('contactType', value)}
               >
-                <SelectTrigger className="focus:ring-2 focus:ring-primary focus:border-transparent">
+                <SelectTrigger className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white">
                   <SelectValue placeholder="Select contact type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -175,7 +180,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
               min="0"
               value={formData.totalLaundries}
               onChange={(e) => handleInputChange('totalLaundries', parseInt(e.target.value) || 0)}
-              className="focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
             />
           </div>
 
@@ -189,7 +194,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
                 type="tel"
                 value={formData.workPhone}
                 onChange={(e) => handleInputChange('workPhone', e.target.value)}
-                className="focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
               />
             </div>
             <div>
@@ -201,7 +206,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
                 type="tel"
                 value={formData.mobilePhone}
                 onChange={(e) => handleInputChange('mobilePhone', e.target.value)}
-                className="focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
               />
             </div>
           </div>
@@ -211,6 +216,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
               id="smsConsent"
               checked={formData.smsConsent}
               onCheckedChange={(checked) => handleInputChange('smsConsent', checked)}
+              className="bg-white"
             />
             <Label htmlFor="smsConsent" className="text-sm font-medium text-muted-foreground">
               I Consent to SMS Communications. Join our SMS list for exclusive updates and reminders. Opt-in by checking this box. Message and data rates may apply.
@@ -225,7 +231,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
               id="address"
               value={formData.address}
               onChange={(e) => handleInputChange('address', e.target.value)}
-              className="focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
             />
           </div>
 
@@ -237,7 +243,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
               id="addressLine2"
               value={formData.addressLine2}
               onChange={(e) => handleInputChange('addressLine2', e.target.value)}
-              className="focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
             />
           </div>
 
@@ -250,7 +256,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
                 id="city"
                 value={formData.city}
                 onChange={(e) => handleInputChange('city', e.target.value)}
-                className="focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
               />
             </div>
             <div>
@@ -261,7 +267,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
                 value={formData.country} 
                 onValueChange={(value) => handleInputChange('country', value)}
               >
-                <SelectTrigger className="focus:ring-2 focus:ring-primary focus:border-transparent">
+                <SelectTrigger className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white">
                   <SelectValue placeholder="Select country" />
                 </SelectTrigger>
                 <SelectContent>
@@ -276,27 +282,113 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
           {showStateField && (
             <div>
               <Label htmlFor="state" className="text-sm font-medium text-muted-foreground mb-2">
-                State/Province
+                State
               </Label>
-              <Input
-                id="state"
-                value={formData.state}
-                onChange={(e) => handleInputChange('state', e.target.value)}
-                className="focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
+              <Select 
+                value={formData.state} 
+                onValueChange={(value) => handleInputChange('state', value)}
+              >
+                <SelectTrigger className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white">
+                  <SelectValue placeholder="Select state" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Alabama">Alabama</SelectItem>
+                  <SelectItem value="Alaska">Alaska</SelectItem>
+                  <SelectItem value="Arizona">Arizona</SelectItem>
+                  <SelectItem value="Arkansas">Arkansas</SelectItem>
+                  <SelectItem value="California">California</SelectItem>
+                  <SelectItem value="Colorado">Colorado</SelectItem>
+                  <SelectItem value="Connecticut">Connecticut</SelectItem>
+                  <SelectItem value="Delaware">Delaware</SelectItem>
+                  <SelectItem value="Florida">Florida</SelectItem>
+                  <SelectItem value="Georgia">Georgia</SelectItem>
+                  <SelectItem value="Hawaii">Hawaii</SelectItem>
+                  <SelectItem value="Idaho">Idaho</SelectItem>
+                  <SelectItem value="Illinois">Illinois</SelectItem>
+                  <SelectItem value="Indiana">Indiana</SelectItem>
+                  <SelectItem value="Iowa">Iowa</SelectItem>
+                  <SelectItem value="Kansas">Kansas</SelectItem>
+                  <SelectItem value="Kentucky">Kentucky</SelectItem>
+                  <SelectItem value="Louisiana">Louisiana</SelectItem>
+                  <SelectItem value="Maine">Maine</SelectItem>
+                  <SelectItem value="Maryland">Maryland</SelectItem>
+                  <SelectItem value="Massachusetts">Massachusetts</SelectItem>
+                  <SelectItem value="Michigan">Michigan</SelectItem>
+                  <SelectItem value="Minnesota">Minnesota</SelectItem>
+                  <SelectItem value="Mississippi">Mississippi</SelectItem>
+                  <SelectItem value="Missouri">Missouri</SelectItem>
+                  <SelectItem value="Montana">Montana</SelectItem>
+                  <SelectItem value="Nebraska">Nebraska</SelectItem>
+                  <SelectItem value="Nevada">Nevada</SelectItem>
+                  <SelectItem value="New Hampshire">New Hampshire</SelectItem>
+                  <SelectItem value="New Jersey">New Jersey</SelectItem>
+                  <SelectItem value="New Mexico">New Mexico</SelectItem>
+                  <SelectItem value="New York">New York</SelectItem>
+                  <SelectItem value="North Carolina">North Carolina</SelectItem>
+                  <SelectItem value="North Dakota">North Dakota</SelectItem>
+                  <SelectItem value="Ohio">Ohio</SelectItem>
+                  <SelectItem value="Oklahoma">Oklahoma</SelectItem>
+                  <SelectItem value="Oregon">Oregon</SelectItem>
+                  <SelectItem value="Pennsylvania">Pennsylvania</SelectItem>
+                  <SelectItem value="Rhode Island">Rhode Island</SelectItem>
+                  <SelectItem value="South Carolina">South Carolina</SelectItem>
+                  <SelectItem value="South Dakota">South Dakota</SelectItem>
+                  <SelectItem value="Tennessee">Tennessee</SelectItem>
+                  <SelectItem value="Texas">Texas</SelectItem>
+                  <SelectItem value="Utah">Utah</SelectItem>
+                  <SelectItem value="Vermont">Vermont</SelectItem>
+                  <SelectItem value="Virginia">Virginia</SelectItem>
+                  <SelectItem value="Washington">Washington</SelectItem>
+                  <SelectItem value="West Virginia">West Virginia</SelectItem>
+                  <SelectItem value="Wisconsin">Wisconsin</SelectItem>
+                  <SelectItem value="Wyoming">Wyoming</SelectItem>
+                  <SelectItem value="District of Columbia">District of Columbia</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {showProvinceField && (
+            <div>
+              <Label htmlFor="province" className="text-sm font-medium text-muted-foreground mb-2">
+                Province
+              </Label>
+              <Select 
+                value={formData.province} 
+                onValueChange={(value) => handleInputChange('province', value)}
+              >
+                <SelectTrigger className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white">
+                  <SelectValue placeholder="Select province" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Alberta">Alberta</SelectItem>
+                  <SelectItem value="British Columbia">British Columbia</SelectItem>
+                  <SelectItem value="Manitoba">Manitoba</SelectItem>
+                  <SelectItem value="New Brunswick">New Brunswick</SelectItem>
+                  <SelectItem value="Newfoundland and Labrador">Newfoundland and Labrador</SelectItem>
+                  <SelectItem value="Northwest Territories">Northwest Territories</SelectItem>
+                  <SelectItem value="Nova Scotia">Nova Scotia</SelectItem>
+                  <SelectItem value="Nunavut">Nunavut</SelectItem>
+                  <SelectItem value="Ontario">Ontario</SelectItem>
+                  <SelectItem value="Prince Edward Island">Prince Edward Island</SelectItem>
+                  <SelectItem value="Quebec">Quebec</SelectItem>
+                  <SelectItem value="Saskatchewan">Saskatchewan</SelectItem>
+                  <SelectItem value="Yukon">Yukon</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           )}
 
           {showCountryField && (
             <div>
-              <Label htmlFor="country" className="text-sm font-medium text-muted-foreground mb-2">
+              <Label htmlFor="country" className="text-sm font-medium text-muted-foreground mb-2">qccc                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
                 Country
               </Label>
               <Input
                 id="country"
                 value={formData.country}
                 onChange={(e) => handleInputChange('country', e.target.value)}
-                className="focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
               />
             </div>
           )}
@@ -309,7 +401,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
               id="postalCode"
               value={formData.postalCode}
               onChange={(e) => handleInputChange('postalCode', e.target.value)}
-              className="focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
             />
           </div>
 
