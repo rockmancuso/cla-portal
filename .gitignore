@@ -5,3 +5,8 @@ dist
 hubspot.config.yaml
 client/src/.DS_Store
 client/.DS_Store
+client/dist
+.DS_Store
+logs.log
+hubspot-proxy.zip
+hubspot-proxy2.zip

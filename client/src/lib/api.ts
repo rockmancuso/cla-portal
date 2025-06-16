@@ -1,3 +1,6 @@
+import axios from "axios";
+const BASE = import.meta.env.VITE_API_GATEWAY_URL;
+
 // Define types for HubSpot data expected by the frontend
 export interface HubSpotContactData {
   membership_type?: string | null;
@@ -67,7 +70,9 @@ export async function getHubSpotDashboardData(): Promise<HubSpotDashboardData> {
   // If no HubSpot data available (local dev), return mock data
   if (!hubspotData || !hubspotData.memberEmail) {
     const mockPaidThrough = new Date();
-    mockPaidThrough.setFullYear(mockPaidThrough.getFullYear() + 1);
+    // Set paid through date to be 15 days from now (within 30-day renewal window)
+    mockPaidThrough.setDate(mockPaidThrough.getDate() + 15);
+    
     const mockStartDate = new Date();
     mockStartDate.setFullYear(mockStartDate.getFullYear() - 1);
     const mockActivatedDate = new Date();
@@ -448,4 +453,59 @@ export async function getAuthMe() {
       lastName: hubspotData.lastName,
     }
   };
+}
+
+// --- Update HubSpot User Profile ---
+
+export async function updateUserProfile(contactId: string, updates: Record<string, string>) {
+  const url = `${BASE}/crm/v3/objects/contacts/${contactId}`;
+  const body = {
+    properties: updates
+  };
+  const { data } = await axios.patch(url, body);
+  return data;
+}
+
+// --- Eventbrite Registration Helpers ---
+
+export async function fetchContactId(email: string) {
+  const url = `${BASE}/crm/v3/objects/contacts/search`;
+  const body = {
+    filterGroups: [
+      {
+        filters: [{ propertyName: "email", operator: "EQ", value: email }]
+      }
+    ],
+    properties: ["id"],
+    limit: 1
+  };
+
+  const { data } = await axios.post(url, body);
+  return data.results?.[0]?.id as string | undefined;
+}
+
+export async function fetchRegistrationIds(contactId: string) {
+  const url = `${BASE}/crm/v3/objects/contacts/${contactId}/associations/p19544225_eventbrite_registrations`;
+  const { data } = await axios.get(url, { params: { limit: 20 } });
+  return data.results.map((r: { id: string }) => r.id) as string[];
+}
+
+export async function fetchRegistrations(ids: string[]) {
+  if (!ids.length) return [];
+  const url = `${BASE}/crm/v3/objects/p19544225_eventbrite_registrations/batch/read`;
+  const body = {
+    inputs: ids.map((id) => ({ id })),
+    properties: [
+      "event_name",
+      "registration_date",
+      "event_start_date",
+      "event_end_date",
+      "event_url",
+      "venue_name",
+      "event_status",
+      "is_free"
+    ]
+  };
+  const { data } = await axios.post(url, body);
+  return data.results;
 }

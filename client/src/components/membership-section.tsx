@@ -129,9 +129,25 @@ export default function MembershipSection({ user, membership: initialMembership,
     );
   }
   
-  // Use initialMembership for renewal notice as HubSpot data might not have this specific logic yet
-  const renewalNeeded = initialMembership?.renewalNeeded;
-  const daysUntilExpiry = initialMembership?.daysUntilExpiry;
+  // Calculate renewalNeeded and daysUntilExpiry from HubSpot membership_paid_through__c
+  const paidThroughDate = hubSpotData?.contact?.membership_paid_through__c
+    ? new Date(hubSpotData.contact.membership_paid_through__c)
+    : null;
+  const now = new Date();
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const calculatedDaysUntilExpiry = paidThroughDate ? Math.ceil((paidThroughDate.getTime() - now.getTime()) / msPerDay) : null;
+  const renewalNeeded = calculatedDaysUntilExpiry !== null && calculatedDaysUntilExpiry <= 30;
+  const daysUntilExpiry = calculatedDaysUntilExpiry;
+
+  // Debug logging
+  console.log('Membership Debug:', {
+    hubSpotData,
+    paidThroughDate: paidThroughDate?.toISOString(),
+    now: now.toISOString(),
+    calculatedDaysUntilExpiry,
+    renewalNeeded,
+    memberStatus: hubSpotData?.contact?.member_status
+  });
 
   return (
     <Card>
@@ -144,8 +160,8 @@ export default function MembershipSection({ user, membership: initialMembership,
           </Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-6">
-        {/* Renewal Notice - using initialMembership data for now */}
+      <CardContent className="p-6 pt-2">
+        {/* Renewal Notice - using HubSpot membership_paid_through__c date */}
         {renewalNeeded && (
           <Alert className="mb-6 border-amber-200 bg-amber-50">
             <AlertTriangle className="h-4 w-4 text-amber-600" />

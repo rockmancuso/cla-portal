@@ -7,6 +7,7 @@ import { apiRequest, getEventbriteEvents, getMyRegisteredEventbriteEvents, getEv
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import RegistrationsSection from "@/components/registrations-section";
 
 // Define types for internal events and registrations if not already globally available
 // This helps in typing the data from useQuery
@@ -102,7 +103,7 @@ export default function EventsSection() {
   const filterUpcomingEvents = (events: EventbriteEventData[]) => {
     const now = new Date();
     const twoMonthsFromNow = new Date();
-    twoMonthsFromNow.setMonth(now.getMonth() + 4);
+    twoMonthsFromNow.setMonth(now.getMonth() + 3);
     
     return events.filter(event => {
       if (!event.startDate) return false;
@@ -112,8 +113,8 @@ export default function EventsSection() {
   };
   
   const filteredUpcomingEvents = filterUpcomingEvents(eventbriteEventsData?.events || []);
-  // Limit to 12 events for better UX (3 rows of 4 or 4 rows of 3)
-  const upcomingEventbriteEvents = filteredUpcomingEvents.slice(0, 12);
+  // Limit to 7 events for better UX
+  const upcomingEventbriteEvents = filteredUpcomingEvents.slice(0, 5);
 
 
   const handleRegister = (eventId: number) => { // For internal events (if still used elsewhere)
@@ -155,9 +156,41 @@ export default function EventsSection() {
     if (includeTime) {
       options.hour = 'numeric';
       options.minute = '2-digit';
-      // options.timeZoneName = 'short'; // Consider if timezone is needed and available
     }
     return new Date(dateString).toLocaleDateString('en-US', options);
+  };
+
+  const formatTimeForDisplay = (dateString: string | undefined | null) => {
+    if (!dateString) return "";
+    return new Date(dateString).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
+  const formatEventDateRange = (startDate: string | undefined | null, endDate: string | undefined | null) => {
+    if (!startDate) return "Date TBD";
+    
+    // Convert dates to Date objects for comparison
+    const start = new Date(startDate);
+    const end = endDate ? new Date(endDate) : null;
+    
+    // Check if dates are on the same day
+    const isSameDay = end && 
+      start.getFullYear() === end.getFullYear() &&
+      start.getMonth() === end.getMonth() &&
+      start.getDate() === end.getDate();
+
+    if (!end || isSameDay) {
+      // Same day event - only show date once
+      const dateStr = formatDateForDisplay(startDate, false); // Don't include time in the date
+      const startTime = formatTimeForDisplay(startDate);
+      const endTime = formatTimeForDisplay(endDate);
+      return `${dateStr} at ${startTime} - ${endTime}`;
+    }
+    
+    // Multi-day event
+    return `${formatDateForDisplay(startDate)} - ${formatDateForDisplay(endDate)}`;
   };
 
   // const isRegisteredForInternalEvent = (eventId: number) => { // No longer using internal registrations for this display
@@ -172,90 +205,8 @@ export default function EventsSection() {
           My Events
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-6">
-        {/* Registered Eventbrite Events */}
-        <div className="mb-8">
-          <h4 className="font-semibold text-muted-foreground mb-3">
-            My Registered Eventbrite Events
-          </h4>
-          {isLoadingMyEventbriteRegistrations && (
-            <div className="space-y-4">
-              {[1, 2].map((i) => ( // Skeleton for registered events
-                <div key={i} className="border border-border rounded-lg p-4">
-                  <Skeleton className="h-5 w-3/4 mb-2" />
-                  <Skeleton className="h-3 w-1/2 mb-1" />
-                  <Skeleton className="h-3 w-1/3 mb-1" />
-                  <Skeleton className="h-8 w-full mt-3" />
-                </div>
-              ))}
-            </div>
-          )}
-          {myEventbriteRegistrationsError && (
-            <Alert variant="destructive">
-              <AlertTitle>Error Fetching Your Registered Events</AlertTitle>
-              <AlertDescription>
-                Could not load your registered events from Eventbrite. Please try again later.
-                {(myEventbriteRegistrationsError as Error)?.message && <p className="text-xs mt-1">Details: {(myEventbriteRegistrationsError as Error).message}</p>}
-              </AlertDescription>
-            </Alert>
-          )}
-          {!isLoadingMyEventbriteRegistrations && !myEventbriteRegistrationsError && (
-            myRegisteredEvents.length > 0 ? (
-              <div className="space-y-4">
-                {myRegisteredEvents.map((event: EventbriteEventData) => ( // Using EventbriteEventData, ensure fields match
-                  <div
-                    key={event.id} // Assuming event.id is the Eventbrite ID from backend
-                    className="border border-border rounded-lg p-4"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-sm font-medium text-foreground line-clamp-2">
-                        {event.name || (event as any).title} {/* Fallback to title if name not present */}
-                      </h3>
-                      <Badge className="bg-green-100 text-green-800 border-green-200 ml-2 flex-shrink-0">
-                        Registered
-                      </Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      <div className="flex items-center">
-                        <CalendarDays className="h-3 w-3 mr-2" />
-                        {formatDateForDisplay(event.startDate, true)} {/* Show time for registered events */}
-                        {event.endDate && event.endDate !== event.startDate &&
-                          ` - ${formatDateForDisplay(event.endDate, true)}`
-                        }
-                      </div>
-                      <div className="flex items-center">
-                        {(event as any).isVirtual || event.location?.toLowerCase() === "online" ? ( // Check isVirtual from backend Event
-                          <Globe className="h-3 w-3 mr-2" />
-                        ) : (
-                          <MapPin className="h-3 w-3 mr-2" />
-                        )}
-                        {event.location || "Location TBD"}
-                      </div>
-                       <div className="flex items-center">
-                        <DollarSign className="h-3 w-3 mr-2" />
-                        {formatPriceDisplayForEventbrite(event)}
-                      </div>
-                    </div>
-                    {/* Link to Eventbrite event page if URL is available */}
-                    {(event.url || (event as any).eventbriteId) && ( // (event as any).eventbriteId for constructing URL if event.url is missing
-                      <Button
-                        size="sm"
-                        className="mt-3 w-full text-xs font-medium bg-accent hover:bg-accent/90 text-accent-foreground transition-colors"
-                        onClick={() => window.open(event.url || `https://www.eventbrite.com/e/${(event as any).eventbriteId}`, "_blank")}
-                      >
-                        View on Eventbrite <ExternalLink className="h-3 w-3 ml-2" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm text-center py-4">
-                You are not currently registered for any events on Eventbrite.
-              </p>
-            )
-          )}
-        </div>
+      <CardContent className="p-6 pt-2">
+      <RegistrationsSection />
 
         {/* Upcoming Events from Eventbrite (General) */}
         <div>
@@ -288,7 +239,7 @@ export default function EventsSection() {
             <div className="space-y-4">
               {upcomingEventbriteEvents.length > 0 ? (
                 <>
-                  {filteredUpcomingEvents.length > 12 && (
+                  {filteredUpcomingEvents.length > 7 && (
                     <div className="text-xs text-muted-foreground mb-4 p-3 bg-muted rounded-lg">
                       Showing {upcomingEventbriteEvents.length} of {filteredUpcomingEvents.length} upcoming events in the next 2 months.
                     </div>
@@ -306,8 +257,7 @@ export default function EventsSection() {
                       <div className="text-xs text-muted-foreground space-y-1">
                         <div className="flex items-center">
                           <CalendarDays className="h-3 w-3 mr-2" />
-                          {formatDateForDisplay(event.startDate)}
-                          {event.endDate && event.endDate !== event.startDate && ` - ${formatDateForDisplay(event.endDate)}`}
+                          {formatEventDateRange(event.startDate, event.endDate)}
                         </div>
                         <div className="flex items-center">
                           {event.location?.toLowerCase() === "online" ? (
@@ -316,7 +266,7 @@ export default function EventsSection() {
                             <MapPin className="h-3 w-3 mr-2" />
                           )}
                           {event.venueName && event.location?.toLowerCase() !== "online"
-                            ? `${event.venueName} - ${event.location}`
+                            ? `${event.venueName}`
                             : event.location || "Location TBD"}
                         </div>
                       </div>

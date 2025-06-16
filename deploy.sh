@@ -21,9 +21,54 @@ ls -la dist/
 echo "Syncing to S3..."
 aws s3 sync dist/client "$S3_BUCKET" --delete
 
-echo "Invalidating CloudFront cache..."
-aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DIST_ID" --paths "/*"
+echo "Invalidating CloudFront cache (running in background)..."
+aws cloudfront create-invalidation --distribution-id E3EFOG0IGJZ6AI --paths "/*" &
 
-echo "Deployment complete!"
+echo "Deployment complete! (Note: CloudFront cache invalidation is running in the background)"
 echo "New asset files:"
 ls -la dist/client
+
+# Function to update Lambda with error handling
+update_lambda() {
+    echo "Creating Lambda deployment package..."
+    if ! cd hubspot-proxy; then
+        echo "❌ Failed to change to hubspot-proxy directory"
+        return 1
+    fi
+    
+    if ! zip -r ../hubspot-proxy.zip .; then
+        echo "❌ Failed to create zip file"
+        cd ..
+        return 1
+    fi
+    
+    if ! aws lambda update-function-code \
+        --function-name hubspot-proxy \
+        --zip-file fileb://../hubspot-proxy.zip \
+        --region us-east-1; then
+        echo "❌ Failed to update Lambda function"
+        cd ..
+        rm -f hubspot-proxy.zip
+        return 1
+    fi
+    
+    cd ..
+    rm -f hubspot-proxy.zip
+    echo "✅ Lambda function updated successfully"
+    return 0
+}
+
+# Prompt for Lambda update
+read -p "Do you want to update the HubSpot proxy Lambda function? (y/n) " -n 1 -r
+echo    # Move to a new line
+if [[ $REPLY =~ ^[Yy]$ ]]
+then
+    if update_lambda; then
+        echo "Lambda update completed successfully"
+    else
+        echo "Lambda update failed"
+        exit 1
+    fi
+else
+    echo "Skipping Lambda update"
+fi

@@ -83,8 +83,8 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg cla-heading">CLA</span>
+              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                <span className="text-white font-bold text-xl cla-heading">CLA</span>
               </div>
               <div>
                 <h1 className="uppercase text-3xl font-bold cla-heading text-white">Member Portal</h1>
