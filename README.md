@@ -1,4 +1,4 @@
-# CLA Portal
+# CLA HubSpot Member Portal
 
 A member portal application with HubSpot and Eventbrite integration.
 
@@ -65,31 +65,129 @@ The following functions have been implemented in `client/src/lib/api.ts`:
    - Now calls the HubSpot integration instead of the Eventbrite API
    - Maintains the same interface for frontend compatibility
 
-### Data Flow
 
-1. User loads the dashboard
-2. HubSpot personalization tokens provide the contact ID and user email
-3. The application queries AWS API Gateway endpoint with the contact ID
-4. AWS Lambda function handles HubSpot API calls server-side to avoid CORS issues
-5. Data is transformed to match the existing EventbriteEventData interface
-6. Events are displayed in the existing UI components
+---
 
-## Development
+## 🌐 High‑Level Architecture
 
-```bash
-# Install dependencies
-npm install
+| Layer              | Service / Technology                          | Purpose                                                                      |
+| ------------------ | --------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Client**         | React (Vite + TS) · Tailwind · TanStack Query | Renders SPA, manages state, calls APIs.                                      |
+| **Static Hosting** | S3 + CloudFront (OAI)                         | Global asset delivery with edge‑cached bundles.                              |
+| **API Gateway**    | REST API (`tvs4suqkuh`)                       | Public entry‑point – forwards `/crm/*` to Lambda, injects CORS headers.      |
+| **Lambda**         | `hubspot-proxy` (Node 18)                     | Signs outbound HubSpot requests with **private‑app token** and returns JSON. |
+| **3rd‑Party APIs** | HubSpot · Eventbrite                          | Source of truth for contact, company and org‑wide event data.                |
 
-# Start development server
-npm run dev
-
-# Type check
-npm run check
-
-# Build for production
-npm run build
+```
+ Browser ─▶ CloudFront ─▶ S3 (static)
+            ║
+            ╚═▶ /crm/* ─▶ API Gateway ─▶ Lambda  ─▶ HubSpot API
+                               │
+                               └──────────────▶ Eventbrite Public API
 ```
 
-## Deployment
+* **Auth model** – HubSpot CMS handles login. If a visitor can load the page they are an authenticated contact.
+* **Data sourcing** – Basic contact/company fields via `window.hubspotPageData`; anything private (custom objects, writes) goes through the proxy.
 
-The application is configured for deployment with the included `deploy.sh` script and CloudFront configuration.
+---
+
+## Current Capabilities
+
+### Dashboard
+
+* **Profile, Membership, Company** cards populated from HubSpot personalisation tokens.
+* **My Events**  ⟶ lists Eventbrite registrations via the custom object ↔ contact association.
+* **Org Events** ⟶ pulls upcoming public events directly from Eventbrite.
+
+### Edit Profile (in‑progress)
+
+* Modal form (`ProfileEditModal`) lets members update Firstname, Lastname, phones, address, etc.
+* Uses new helper `updateUserProfile(contactId, properties)`  → PATCH via Lambda to HubSpot.
+* Local + admin testing supported via `?email=test@example.com` URL param (dev or admin only).
+
+### Dev Quality‑of‑Life
+
+* **Vite Hot Reload** with Tailwind JIT.
+* Mock fallbacks for Eventbrite + HubSpot so the SPA boots with no secrets in local dev.
+* One‑command deploy: `deploy.sh` (build → sync to S3 → invalidate CloudFront).
+
+---
+
+## 💾 Environment Variables (`.env`)
+
+```env
+# Eventbrite
+VITE_EVENTBRITE_PRIVATE_TOKEN=
+VITE_EVENTBRITE_ORGANIZATION_ID=
+
+# AWS / Proxy
+VITE_API_GATEWAY_URL=https://tvs4suqkuh.execute-api.us-east-1.amazonaws.com/prod
+
+# Local testing helpers
+VITE_DEFAULT_TEST_EMAIL=test@example.com  # optional – used when ?email= not supplied
+```
+
+*No HubSpot secret is exposed to the browser – it lives as `HUBSPOT_ACCESS_TOKEN` in the Lambda environment.*
+
+---
+
+## 🗂️ Code Map (client/src)
+
+| Path                                | Notes                                                          |
+| ----------------------------------- | -------------------------------------------------------------- |
+| `main.tsx`                          | React root – adds `QueryClientProvider` + Router.              |
+| `pages/dashboard.tsx`               | Shell layout & card composition.                               |
+| `components/events-section.tsx`     | Org events + My registrations sub‑sections.                    |
+| `components/profile-edit-modal.tsx` | Inline edit modal (uses `updateUserProfile`).                  |
+| `hooks/use-registrations.ts`        | React‑Query hook; respects `?email=` override.                 |
+| `lib/api.ts`                        | **All** remote I/O – Eventbrite, proxy’d HubSpot reads/writes. |
+
+---
+
+## 🔄 Data Flow – *My Registered Events*
+
+1. **Contact email** read from `hubspotPageData` **or** `?email=` override.
+2. `useRegistrations` → `getHubSpotEventbriteRegistrations(contactId)`
+3. API Gateway `/crm/v3/objects/contacts/{id}` `?associations=eventbrite_registrations`
+4. Lambda adds auth header → HubSpot returns custom object records.
+5. Client maps to `EventbriteEventData` → renders in Events section.
+
+---
+
+## 🚧 In‑Progress / Backlog
+
+| ID             | Task                                                                   | Status                                                |
+| -------------- | ---------------------------------------------------------------------- | ----------------------------------------------------- |
+| **#EP‑1**      | **Finish Edit Profile** (PATCH contact + validation + success banner)  | 70% – PATCH works, need full field list and UI polish |
+| **#EV‑cache**  | Cache org‑wide Eventbrite list in Edge @ CloudFront to cut cold starts | Not started                                           |
+| **#Analytics** | Add PostHog for portal usage metrics                                   | Not started – blocked on budget OK                    |
+| **#Docs**      | Keep README synced with infra/code – this doc                          | **✅ Up to date (Jun 16 2025)**                        |
+
+---
+
+## 🛠  Running Locally
+
+```bash
+pnpm install          # or npm / yarn
+pnpm dev              # http://localhost:5173
+
+# test another user
+open "http://localhost:5173?email=someone@laundryassociation.org"
+```
+
+---
+
+## 🚀 Deployment Workflow
+
+1. `pnpm build` – Vite → `/dist`
+2. `./deploy.sh` – Upload to S3, invalidate CloudFront.
+3. Lambda + API Gateway are pre‑packaged in `hubspot-proxy.yaml` (SAM).
+   `sam deploy --guided` when infra changes.
+
+---
+
+### Contributors / Contact
+
+* Rob (@rockmancuso) – Front‑end & AWS
+* CLA Staff – Domain experts, data mapping
+* PRs welcome → open an issue first for discussion.
