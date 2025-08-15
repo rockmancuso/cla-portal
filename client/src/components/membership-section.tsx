@@ -15,14 +15,22 @@ import {
   Clock,
   CheckCircle,
   Loader2, // For loading state
-  ServerCrash // For error state
+  ServerCrash, // For error state
+  RefreshCw, // For auto-renewal
+  Check, // For success state
+  User as UserIcon, // For Individual Membership Information
+  Building2 // For Company Membership Information
 } from "lucide-react";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { getHubSpotDashboardData, type HubSpotDashboardData } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getHubSpotDashboardData, updateAutoRenewalRequest, type HubSpotDashboardData } from "@/lib/api";
 import type { User, Membership } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton"; // For loading skeletons
 import { displayValue, displayValueWithFallback } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+
+// Feature flag: hide renewal and auto-renewal UI when enabled (Vite replaces this at build time)
+const HIDE_RENEWAL_UI = import.meta.env.VITE_HIDE_RENEWAL_UI === 'true';
 
 interface MembershipSectionProps {
   user: User; // Keep user prop for now, might contain other relevant info
@@ -33,11 +41,59 @@ interface MembershipSectionProps {
 
 export default function MembershipSection({ user, membership: initialMembership, onEditProfile }: MembershipSectionProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [localAutoRenewalRequest, setLocalAutoRenewalRequest] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   const { data: hubSpotData, isLoading: isLoadingHubSpot, error: hubSpotError } = useQuery<HubSpotDashboardData, Error>({
     queryKey: ['hubspotDashboardData', user.id], // Include user.id in queryKey if data is user-specific
     queryFn: getHubSpotDashboardData,
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Helper function to check if auto-renewal is enabled (either property)
+  const isAutoRenewalEnabled = () => {
+    // Handle string "null" values from HubSpot personalization tokens
+    const autoRenewingValue = hubSpotData?.contact?.auto_renewing_;
+    const autoRenewalRequestValue = hubSpotData?.contact?.auto_renewal_request;
+    
+    // Convert to boolean, handling string "null", "true", "false", "Yes" and actual boolean values
+    const autoRenewing = autoRenewingValue === true || autoRenewingValue === "true" || autoRenewingValue === "Yes";
+    const autoRenewalRequest = autoRenewalRequestValue === true || autoRenewalRequestValue === "true";
+    const localRequest = localAutoRenewalRequest;
+    
+    // Debug logging
+    console.log('Auto-renewal debug:', {
+      autoRenewing,
+      autoRenewalRequest,
+      localRequest,
+      rawAutoRenewing: autoRenewingValue,
+      rawAutoRenewalRequest: autoRenewalRequestValue,
+      hubSpotData: hubSpotData?.contact
+    });
+    
+    return autoRenewing || autoRenewalRequest || localRequest;
+  };
+
+  // Auto-renewal mutation
+  const autoRenewalMutation = useMutation({
+    mutationFn: () => updateAutoRenewalRequest(user.hubspotContactId || '', true),
+    onSuccess: () => {
+      setLocalAutoRenewalRequest(true); // Update local state immediately
+      queryClient.invalidateQueries({ queryKey: ['hubspotDashboardData', user.id] });
+      toast({
+        title: "Auto-renewal enabled",
+        description: "Thank you for updating your renewal settings. Your membership will now auto-renew.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Request failed",
+        description: "Failed to submit auto-renewal request. Please try again or contact support.",
+        variant: "destructive",
+      });
+      console.error('Auto-renewal request error:', error);
+    },
   });
 
   // TODO: The existing formData for company info editing might need to be updated
@@ -58,6 +114,14 @@ export default function MembershipSection({ user, membership: initialMembership,
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hubSpotData?.company?.name]);
+
+  // Sync local auto-renewal state with HubSpot data
+  React.useEffect(() => {
+    const autoRenewalRequestValue = hubSpotData?.contact?.auto_renewal_request;
+    if (autoRenewalRequestValue === true || autoRenewalRequestValue === "true") {
+      setLocalAutoRenewalRequest(true);
+    }
+  }, [hubSpotData?.contact?.auto_renewal_request]);
 
 
   const handleSave = () => {
@@ -162,13 +226,13 @@ export default function MembershipSection({ user, membership: initialMembership,
       </CardHeader>
       <CardContent className="p-6 pt-2">
         {/* Renewal Notice - using HubSpot membership_paid_through__c date */}
-        {renewalNeeded && (
+        {!HIDE_RENEWAL_UI && renewalNeeded && !isAutoRenewalEnabled() && (
           <Alert className="mb-6 border-amber-200 bg-amber-50">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
             <AlertDescription className="text-amber-700">
               <div className="font-medium mb-1">Renewal Reminder</div>
               <p className="text-sm mb-3">
-                Your membership expires in {daysUntilExpiry} days.
+                Your membership expires in {daysUntilExpiry} days!
                 Renew now to continue enjoying all member benefits.
               </p>
               <Button onClick={handleRenewal} className="btn-accent">
@@ -176,6 +240,71 @@ export default function MembershipSection({ user, membership: initialMembership,
               </Button>
             </AlertDescription>
           </Alert>
+        )}
+
+        {/* Auto-Renewal Confirmation Message */}
+        {!HIDE_RENEWAL_UI && renewalNeeded && isAutoRenewalEnabled() && (
+          <Alert className="mb-6 border-green-200 bg-green-50">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-700">
+              <div className="font-medium mb-1">Auto-Renewal Active</div>
+              <p className="text-sm">
+                Your membership expires in {daysUntilExpiry} days, but don't worry! 
+                Your auto-renewal is enabled and your membership will be automatically renewed.
+              </p>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Auto-Renewal Section */}
+        {!HIDE_RENEWAL_UI && !(renewalNeeded && isAutoRenewalEnabled()) && (
+          <div className="mb-6">
+            <div className="bg-muted rounded-lg p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-3">
+                  <RefreshCw className={`h-5 w-5 mt-0.5 ${isAutoRenewalEnabled() ? 'text-green-600' : 'text-muted-foreground'}`} />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-secondary mb-1">Auto-Renewal</h4>
+                    {isAutoRenewalEnabled() ? (
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          Your membership will auto-renew, ensuring uninterrupted CLA benefits.
+                        </p>
+                        <div className="flex items-center space-x-2 text-green-600">
+                          <Check className="h-4 w-4" />
+                          <span className="text-sm font-medium">Auto-renewal enabled</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Enable auto-renewal to ensure you can enjoy your CLA membership benefits without interruption.
+                        </p>
+                        <Button
+                          onClick={() => autoRenewalMutation.mutate()}
+                          disabled={autoRenewalMutation.isPending}
+                          className="btn-primary"
+                          size="sm"
+                        >
+                          {autoRenewalMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Submitting...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Enable Auto-Renewal
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Membership Status Cards - Using HubSpot Data */}
@@ -207,7 +336,7 @@ export default function MembershipSection({ user, membership: initialMembership,
           <div className="bg-muted rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Current Term Start Date</p>
+                <p className="text-sm text-muted-foreground">Membership Term Start Date</p>
                 <p className="font-semibold text-secondary">
                   {formatDate(hubSpotData?.contact?.current_term_start_date__c)}
                 </p>
@@ -219,7 +348,7 @@ export default function MembershipSection({ user, membership: initialMembership,
           <div className="bg-muted rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Paid Through</p>
+                <p className="text-sm text-muted-foreground">Membership Paid Through</p>
                 <p className="font-semibold text-secondary">
                   {formatDate(hubSpotData?.contact?.membership_paid_through__c)}
                 </p>
@@ -231,9 +360,9 @@ export default function MembershipSection({ user, membership: initialMembership,
 
         {/* Company Information Section - Using HubSpot Data for display */}
         {/* The editing part of company info is kept as is, using formData state */}
-        <div className="border-t border-border pt-6">
+        <div className="border-t border-border pt-6 pl-2">
           <div className="flex items-center justify-between mb-4">
-            <h4 className="font-semibold text-secondary">Company Information</h4>
+            <h3 className="font-semibold text-secondary text-lg">My Membership Details</h3>
             <Button
               variant="outline"
               size="sm"
@@ -302,19 +431,20 @@ export default function MembershipSection({ user, membership: initialMembership,
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h5 className="text-sm font-medium text-muted-foreground mb-3">
-                  Member Information (from HubSpot)
+              <div className="md:border-r">
+                <h5 className="flex items-center gap-1 text-base md:text-sm font-bold mb-3 px-3 py-2 rounded border-l-4 border-cla-blue shadow-sm w-max">
+                  <UserIcon className="h-4 w-4 text-cla-blue" />
+                  <span className="text-cla-blue">Individual</span> Membership Information
                 </h5>
-                <div className="space-y-3">
+                <div className="space-y-3 md:pr-4">
                   <div>
-                    <label className="text-xs text-muted-foreground">Member ID (from profile)</label>
+                    <label className="text-xs text-muted-foreground">Member ID</label>
                     <p className="text-sm font-medium">
                       {initialMembership?.membershipId || user.id /* Fallback to user.id or similar */}
                     </p>
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">Membership Type (Contact)</label>
+                    <label className="text-xs text-muted-foreground"><span className="text-cla-blue font-bold">Individual</span> Membership Type</label>
                     <p className="text-sm font-medium">
                       {displayValue(hubSpotData?.contact?.membership_type)}
                     </p>
@@ -327,9 +457,10 @@ export default function MembershipSection({ user, membership: initialMembership,
                   </div>
                 </div>
               </div>
-              <div>
-                <h5 className="text-sm font-medium text-muted-foreground mb-3">
-                  Company Information (from HubSpot)
+              <div className="md:pl-4 md:ml-0">
+                <h5 className="flex items-center gap-1 text-base md:text-sm font-bold mb-3 px-3 py-2 rounded border-l-4 border-cla-blue shadow-sm w-max">
+                  <Building2 className="h-4 w-4 text-cla-blue" />
+                  <span className="text-cla-blue">Company</span> Membership Information
                 </h5>
                 <div className="space-y-3">
                   <div>
@@ -337,7 +468,7 @@ export default function MembershipSection({ user, membership: initialMembership,
                     <p className="text-sm font-medium">{displayValue(hubSpotData?.company?.name)}</p>
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">Company Membership Type</label>
+                    <label className="text-xs text-muted-foreground"><span className="text-cla-blue font-bold">Company</span> Membership Type</label>
                     <p className="text-sm font-medium">{displayValue(hubSpotData?.company?.membership_type)}</p>
                   </div>
                   {/* These fields are not in the current HubSpot fetch, using user prop as fallback */}
@@ -362,13 +493,22 @@ export default function MembershipSection({ user, membership: initialMembership,
               <Edit className="h-4 w-4 mr-2" />
               Edit Profile
             </Button>
-            <Button variant="outline">
+            {/* <Button variant="outline">
               <Download className="h-4 w-4 mr-2" />
               Download Member Card
-            </Button>
-            <Button variant="outline">
-              <Gift className="h-4 w-4 mr-2" />
-              View Benefits
+            </Button> */}
+            <Button
+              variant="outline"
+              asChild
+            >
+              <a
+                href="https://laundryassociation.org/membership/benefits/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Gift className="h-4 w-4 mr-2" />
+                View Benefits
+              </a>
             </Button>
           </div>
         </div>

@@ -12,8 +12,9 @@ command -v npx >/dev/null 2>&1 || { echo >&2 "npx not found. Aborting."; exit 1;
 echo "Cleaning previous build..."
 rm -rf dist/
 
+# THE RENEWAL UI ELEMENTS WILL NOT SHOW WITH THE FLAG IN FRONT OF `npx vite build`
 echo "Building project..."
-npx vite build
+VITE_HIDE_RENEWAL_UI=true npx vite build
 
 echo "Listing build output:"
 ls -la dist/

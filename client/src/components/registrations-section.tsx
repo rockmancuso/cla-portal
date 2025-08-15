@@ -108,10 +108,7 @@ export default function RegistrationsSection() {
   if (!data?.length) {
     return (
       <div className="mb-8">
-        <h4 className="font-semibold text-muted-foreground mb-3">
-          My Registered Eventbrite Events
-        </h4>
-        <p className="text-muted-foreground text-sm text-center py-4">
+        <p className="text-muted-foreground text-sm text-center pt-0 py-4">
           You are not currently registered for any events on Eventbrite.
         </p>
       </div>
@@ -120,9 +117,6 @@ export default function RegistrationsSection() {
 
   return (
     <div className="mb-8">
-      <h4 className="font-semibold text-muted-foreground mb-3">
-        My Registered Eventbrite Events
-      </h4>
       <div className="space-y-4">
         {data.map((event: any) => {
           // Find matching event from Eventbrite API data by name

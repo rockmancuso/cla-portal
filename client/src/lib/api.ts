@@ -11,6 +11,8 @@ export interface HubSpotContactData {
   email?: string;
   firstName?: string;
   lastName?: string;
+  auto_renewing_?: boolean | string | null;
+  auto_renewal_request?: boolean | string | null;
 }
 
 export interface HubSpotCompanyData {
@@ -70,8 +72,20 @@ export async function getHubSpotDashboardData(): Promise<HubSpotDashboardData> {
   // If no HubSpot data available (local dev), return mock data
   if (!hubspotData || !hubspotData.memberEmail) {
     const mockPaidThrough = new Date();
-    // Set paid through date to be 15 days from now (within 30-day renewal window)
-    mockPaidThrough.setDate(mockPaidThrough.getDate() + 15);
+    
+    // 🧪 TEST SCENARIOS - Uncomment one of these to test different renewal scenarios:
+    
+    // Scenario 1: Member needs renewal (15 days left) - should show amber renewal reminder
+    //mockPaidThrough.setDate(mockPaidThrough.getDate() + 15);
+    
+    // Scenario 2: Member needs renewal with auto-renewal enabled - should show green confirmation
+     mockPaidThrough.setDate(mockPaidThrough.getDate() + 15);
+    
+    // Scenario 3: Member has plenty of time (60 days left) - should show no reminder
+    // mockPaidThrough.setDate(mockPaidThrough.getDate() + 60);
+    
+    // Scenario 4: Member is already expired (-5 days) - should show renewal reminder
+    // mockPaidThrough.setDate(mockPaidThrough.getDate() - 5);
     
     const mockStartDate = new Date();
     mockStartDate.setFullYear(mockStartDate.getFullYear() - 1);
@@ -88,6 +102,9 @@ export async function getHubSpotDashboardData(): Promise<HubSpotDashboardData> {
         email: 'demo@example.com',
         firstName: 'Demo',
         lastName: 'User',
+        // 🧪 AUTO-RENEWAL TEST - Change this to test auto-renewal scenarios:
+        auto_renewing_: false, // Set to true, "true", or "Yes" to test auto-renewal enabled
+        auto_renewal_request: false, // Mock: no request submitted
       },
       company: {
         name: 'Demo Company',
@@ -106,6 +123,8 @@ export async function getHubSpotDashboardData(): Promise<HubSpotDashboardData> {
       email: hubspotData.memberEmail,
       firstName: hubspotData.firstName,
       lastName: hubspotData.lastName,
+      auto_renewing_: hubspotData.autoRenewing || null,
+      auto_renewal_request: hubspotData.autoRenewingRequest || null,
     },
     company: {
       name: hubspotData.companyName || null,
@@ -473,6 +492,19 @@ export async function updateUserProfile(contactId: string, updates: Record<strin
   const url = `${BASE}/crm/v3/objects/contacts/${contactId}`;
   const body = {
     properties: updates
+  };
+  const { data } = await axios.patch(url, body);
+  return data;
+}
+
+// --- Update Auto-Renewal Request ---
+
+export async function updateAutoRenewalRequest(contactId: string, autoRenewalRequest: boolean) {
+  const url = `${BASE}/crm/v3/objects/contacts/${contactId}`;
+  const body = {
+    properties: {
+      auto_renewal_request: autoRenewalRequest.toString()
+    }
   };
   const { data } = await axios.patch(url, body);
   return data;

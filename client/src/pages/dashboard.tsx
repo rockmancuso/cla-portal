@@ -136,7 +136,14 @@ export default function Dashboard() {
                   {user.firstName?.[0]}{user.lastName?.[0]}
                 </span>
               </div>
-              <ExternalLink className="w-5 h-5 text-blue-200" />
+              <a
+                href="https://pages.laundryassociation.org/_hcms/logout?redirect_url=https://www.laundryassociation.org"
+                target="_self"
+                className="cursor-pointer hover:opacity-80 transition-opacity"
+                title="Sign out"
+              >
+                <ExternalLink className="w-5 h-5 text-blue-200" />
+              </a>
             </div>
           </div>
         </div>
@@ -149,7 +156,7 @@ export default function Dashboard() {
             Welcome back, {user?.firstName || 'Guest'}!
           </h2>
           <p className="text-gray-600 text-lg cla-body">
-            Manage your membership, events, and profile from your personalized dashboard.
+            Manage your CLA membership, profile, and events from your personalized dashboard.
           </p>
         </div>
 
@@ -245,7 +252,7 @@ export default function Dashboard() {
         </div>
 
         {/* Enhanced Recent Activity */}
-        <div className="mt-8">
+        {/* <div className="mt-8">
           <Card className="bg-white/80 backdrop-blur-sm border border-white/50 shadow-xl hover:shadow-2xl transition-all duration-300">
             <CardHeader className="bg-gradient-to-r from-gray-600 to-slate-700 text-white rounded-t-lg">
               <CardTitle className="flex items-center space-x-2">
@@ -292,7 +299,7 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </div> */}
       </main>
 
       <ProfileEditModal 

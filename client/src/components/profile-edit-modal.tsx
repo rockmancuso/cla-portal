@@ -28,6 +28,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
   const [formData, setFormData] = useState({
     firstName: user.firstName,
     lastName: user.lastName,
+    email: user.email || '',
     individualType: user.individualType || '',
     contactType: user.contactType || '',
     totalLaundries: user.totalLaundries || 0,
@@ -47,6 +48,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
     mutationFn: () => updateUserProfile(user.hubspotContactId, {
       firstname: formData.firstName,
       lastname: formData.lastName,
+      email: formData.email,
       individual_type__c: formData.individualType,
       contact_type: formData.contactType,
       total_of_laundries__c: formData.totalLaundries.toString(),
@@ -125,6 +127,20 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
                 required
               />
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="email" className="text-sm font-medium text-muted-foreground mb-2">
+              Email Address
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => handleInputChange('email', e.target.value)}
+              className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+              required
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

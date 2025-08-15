@@ -241,7 +241,7 @@ export default function EventsSection() {
                 <>
                   {filteredUpcomingEvents.length > 7 && (
                     <div className="text-xs text-muted-foreground mb-4 p-3 bg-muted rounded-lg">
-                      Showing {upcomingEventbriteEvents.length} of {filteredUpcomingEvents.length} upcoming events in the next 2 months.
+                      Showing {upcomingEventbriteEvents.length} of {filteredUpcomingEvents.length} upcoming events
                     </div>
                   )}
                   {upcomingEventbriteEvents.map((event: EventbriteEventData) => (
@@ -270,11 +270,7 @@ export default function EventsSection() {
                             : event.location || "Location TBD"}
                         </div>
                       </div>
-                      {event.description && (
-                        <p className="!text-xs text-muted-foreground mt-2 line-clamp-3">
-                          {event.description}
-                        </p>
-                      )}
+                      
                       {event.url && (
                         <Button
                           size="sm"

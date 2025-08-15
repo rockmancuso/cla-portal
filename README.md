@@ -129,6 +129,28 @@ VITE_DEFAULT_TEST_EMAIL=test@example.com  # optional – used when ?email= not 
 
 *No HubSpot secret is exposed to the browser – it lives as `HUBSPOT_ACCESS_TOKEN` in the Lambda environment.*
 
+### UI Feature Flags
+
+- `VITE_HIDE_RENEWAL_UI` (default: not set)
+  - When set to `true`, hides all membership renewal and auto‑renewal notices/buttons in the UI.
+  - This is a build‑time flag (Vite). Make sure it is set in the environment for the client build.
+
+Examples:
+
+```bash
+# Local dev (one‑off)
+VITE_HIDE_RENEWAL_UI=true pnpm dev
+
+# Local dev (persistent)
+echo "VITE_HIDE_RENEWAL_UI=true" >> client/.env.local
+
+# CI / deploy build (inline)
+VITE_HIDE_RENEWAL_UI=true pnpm build
+
+# Our deploy script usage (inside deploy.sh)
+VITE_HIDE_RENEWAL_UI=true npx vite build
+```
+
 ---
 
 ## 🗂️ Code Map (client/src)
