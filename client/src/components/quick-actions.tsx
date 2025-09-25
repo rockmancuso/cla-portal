@@ -62,6 +62,19 @@ export default function QuickActions() {
               </Button>
             );
           })}
+          
+          <a
+            href="https://member.laundryassociation.org/subscription-preferences"
+            className="block"
+          >
+            <Button
+              variant="outline"
+              className="w-full justify-start p-3 h-auto hover:bg-cla-blue transition-colors"
+            >
+              <Users className="h-4 w-4 text-muted-foreground mr-3" />
+              <span className="text-sm font-medium">Manage Subscription Preferences</span>
+            </Button>
+          </a>
         </div>
       </CardContent>
     </Card>

@@ -49,8 +49,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
       firstname: formData.firstName,
       lastname: formData.lastName,
       email: formData.email,
-      individual_type__c: formData.individualType,
-      contact_type: formData.contactType,
+      // contact_type: formData.contactType, // Removed - Contact Type is not editable
       total_of_laundries__c: formData.totalLaundries.toString(),
       phone: formData.workPhone,
       mobilephone: formData.mobilePhone,
@@ -104,7 +103,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <Label htmlFor="firstName" className="text-sm font-medium text-muted-foreground mb-2">
+              <Label htmlFor="firstName" className="text-md font-medium text-muted-foreground mb-2">
                 First Name
               </Label>
               <Input
@@ -116,7 +115,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
               />
             </div>
             <div>
-              <Label htmlFor="lastName" className="text-sm font-medium text-muted-foreground mb-2">
+              <Label htmlFor="lastName" className="text-md font-medium text-muted-foreground mb-2">
                 Last Name
               </Label>
               <Input
@@ -130,7 +129,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
           </div>
 
           <div>
-            <Label htmlFor="email" className="text-sm font-medium text-muted-foreground mb-2">
+            <Label htmlFor="email" className="text-md font-medium text-muted-foreground mb-2">
               Email Address
             </Label>
             <Input
@@ -143,51 +142,8 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label htmlFor="individualType" className="text-sm font-medium text-muted-foreground mb-2">
-                Individual Type
-              </Label>
-              <Select 
-                value={formData.individualType} 
-                onValueChange={(value) => handleInputChange('individualType', value)}
-              >
-                <SelectTrigger className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Store Owner">Store Owner</SelectItem>
-                  <SelectItem value="Potential Investor">Potential Investor</SelectItem>
-                  <SelectItem value="Store Employee">Store Employee</SelectItem>
-                  <SelectItem value="Distributor">Distributor</SelectItem>
-                  <SelectItem value="Manufacturer">Manufacturer</SelectItem>
-                  <SelectItem value="Service Provider">Service Provider</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="contactType" className="text-sm font-medium text-muted-foreground mb-2">
-                Contact Type
-              </Label>
-              <Select 
-                value={formData.contactType} 
-                onValueChange={(value) => handleInputChange('contactType', value)}
-              >
-                <SelectTrigger className="focus:ring-2 focus:ring-primary focus:border-transparent bg-white">
-                  <SelectValue placeholder="Select contact type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Primary Contact">Primary Contact</SelectItem>
-                  <SelectItem value="Billing Contact">Billing Contact</SelectItem>
-                  <SelectItem value="Both">Both</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
           <div>
-            <Label htmlFor="totalLaundries" className="text-sm font-medium text-muted-foreground mb-2">
+            <Label htmlFor="totalLaundries" className="text-md font-medium text-muted-foreground mb-2">
               Total # of Laundries
             </Label>
             <Input
@@ -202,7 +158,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <Label htmlFor="workPhone" className="text-sm font-medium text-muted-foreground mb-2">
+              <Label htmlFor="workPhone" className="text-md font-medium text-muted-foreground mb-2">
                 Work Phone Number
               </Label>
               <Input
@@ -214,7 +170,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
               />
             </div>
             <div>
-              <Label htmlFor="mobilePhone" className="text-sm font-medium text-muted-foreground mb-2">
+              <Label htmlFor="mobilePhone" className="text-md font-medium text-muted-foreground mb-2">
                 Mobile Phone Number
               </Label>
               <Input
@@ -240,7 +196,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
           </div>
 
           <div>
-            <Label htmlFor="address" className="text-sm font-medium text-muted-foreground mb-2">
+            <Label htmlFor="address" className="text-md font-medium text-muted-foreground mb-2">
               Street Address
             </Label>
             <Input
@@ -252,7 +208,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
           </div>
 
           <div>
-            <Label htmlFor="addressLine2" className="text-sm font-medium text-muted-foreground mb-2">
+            <Label htmlFor="addressLine2" className="text-md font-medium text-muted-foreground mb-2">
               Address Line 2
             </Label>
             <Input
@@ -265,7 +221,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <Label htmlFor="city" className="text-sm font-medium text-muted-foreground mb-2">
+              <Label htmlFor="city" className="text-md font-medium text-muted-foreground mb-2">
                 City
               </Label>
               <Input
@@ -276,7 +232,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
               />
             </div>
             <div>
-              <Label htmlFor="country" className="text-sm font-medium text-muted-foreground mb-2">
+              <Label htmlFor="country" className="text-md font-medium text-muted-foreground mb-2">
                 Country
               </Label>
               <Select 
@@ -297,7 +253,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
 
           {showStateField && (
             <div>
-              <Label htmlFor="state" className="text-sm font-medium text-muted-foreground mb-2">
+              <Label htmlFor="state" className="text-md font-medium text-muted-foreground mb-2">
                 State
               </Label>
               <Select 
@@ -366,7 +322,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
 
           {showProvinceField && (
             <div>
-              <Label htmlFor="province" className="text-sm font-medium text-muted-foreground mb-2">
+              <Label htmlFor="province" className="text-md font-medium text-muted-foreground mb-2">
                 Province
               </Label>
               <Select 
@@ -397,7 +353,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
 
           {showCountryField && (
             <div>
-              <Label htmlFor="country" className="text-sm font-medium text-muted-foreground mb-2">qccc                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+              <Label htmlFor="country" className="text-sm ````font-medium text-muted-foreground mb-2">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
                 Country
               </Label>
               <Input
@@ -410,7 +366,7 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
           )}
 
           <div>
-            <Label htmlFor="postalCode" className="text-sm font-medium text-muted-foreground mb-2">
+            <Label htmlFor="postalCode" className="text-md font-medium text-muted-foreground mb-2">
               Postal Code
             </Label>
             <Input
