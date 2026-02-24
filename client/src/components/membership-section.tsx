@@ -135,9 +135,10 @@ export default function MembershipSection({ user, membership: initialMembership,
   };
 
   const formatDate = (dateString?: string | null, options?: Intl.DateTimeFormatOptions) => {
-    if (!dateString || dateString === 'null' || dateString === 'undefined') return '';
+    const safeDate = createSafeDate(dateString);
+    if (!safeDate) return '';
     try {
-      return new Date(dateString).toLocaleDateString('en-US', options || { month: 'long', day: 'numeric', year: 'numeric' });
+      return safeDate.toLocaleDateString('en-US', options || { month: 'long', day: 'numeric', year: 'numeric' });
     } catch (e) {
       return '';
     }
@@ -193,20 +194,27 @@ export default function MembershipSection({ user, membership: initialMembership,
     );
   }
   
+  // Helper function to safely create and validate dates
+  const createSafeDate = (dateString?: string | null): Date | null => {
+    if (!dateString || dateString === 'null' || dateString === 'undefined' || dateString === '') {
+      return null;
+    }
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? null : date;
+  };
+
   // Calculate renewalNeeded and daysUntilExpiry from HubSpot membership_paid_through__c
-  const paidThroughDate = hubSpotData?.contact?.membership_paid_through__c
-    ? new Date(hubSpotData.contact.membership_paid_through__c)
-    : null;
+  const paidThroughDate = createSafeDate(hubSpotData?.contact?.membership_paid_through__c);
   const now = new Date();
   const msPerDay = 1000 * 60 * 60 * 24;
   const calculatedDaysUntilExpiry = paidThroughDate ? Math.ceil((paidThroughDate.getTime() - now.getTime()) / msPerDay) : null;
   const renewalNeeded = calculatedDaysUntilExpiry !== null && calculatedDaysUntilExpiry <= 30;
   const daysUntilExpiry = calculatedDaysUntilExpiry;
 
-  // Debug logging
+  // Debug logging with safe date handling
   console.log('Membership Debug:', {
     hubSpotData,
-    paidThroughDate: paidThroughDate?.toISOString(),
+    paidThroughDate: paidThroughDate ? paidThroughDate.toISOString() : 'Invalid or null date',
     now: now.toISOString(),
     calculatedDaysUntilExpiry,
     renewalNeeded,

@@ -1,9 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { CalendarDays, MapPin, DollarSign, Globe, ExternalLink } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest, getEventbriteEvents, getMyRegisteredEventbriteEvents, getEvents, type EventbriteEventData, type EventbriteEventsResponse } from "@/lib/api";
+import { CalendarDays, MapPin, Globe, ExternalLink } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getEventbriteEvents, type EventbriteEventData, type EventbriteEventsResponse } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -43,12 +42,9 @@ interface InternalRegistrationsResponse {
 export default function EventsSection() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const SHOW_UPCOMING = false;
 
-  // Query for internal events (existing)
-  const { data: internalEventsData } = useQuery<Awaited<ReturnType<typeof getEvents>>>({
-    queryKey: ["internalEvents"],
-    queryFn: getEvents,
-  });
+  // (removed) Internal events query – not used
 
   // Query for internal registrations (existing) - This will be replaced by Eventbrite registered events
   // const { data: registrationsData } = useQuery<InternalRegistrationsResponse>({
@@ -56,15 +52,7 @@ export default function EventsSection() {
   //   queryFn: () => apiRequest("GET", "/api/events/registered").then(res => res.json()),
   // });
 
-  // Fetching User's Registered Eventbrite Events
-  const {
-    data: myEventbriteRegistrationsData,
-    isLoading: isLoadingMyEventbriteRegistrations,
-    error: myEventbriteRegistrationsError,
-  } = useQuery<EventbriteEventsResponse>({ // Assuming EventbriteEventsResponse { events: Event[] }
-    queryKey: ["myEventbriteRegisteredEvents"],
-    queryFn: getMyRegisteredEventbriteEvents,
-  });
+  // (removed) Registered Eventbrite events query – handled in RegistrationsSection
   
   // Fetching general upcoming Eventbrite events
   const {
@@ -74,30 +62,12 @@ export default function EventsSection() {
   } = useQuery<EventbriteEventsResponse>({
     queryKey: ["eventbriteEvents"],
     queryFn: getEventbriteEvents,
+    enabled: SHOW_UPCOMING,
   });
 
-  const registerMutation = useMutation({
-    mutationFn: (eventId: number) => // Assuming internal event ID
-      apiRequest("POST", `/api/events/${eventId}/register`, {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/events/registered"] });
-      toast({
-        title: "Registration successful",
-        description: "You have been registered for the event",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Registration failed",
-        description: "Please try again or contact support",
-        variant: "destructive",
-      });
-    },
-  });
+  // (removed) Internal register mutation – not used in this component
 
-  const internalEvents = internalEventsData?.events || [];
-  // const registrations = registrationsData?.registrations || []; // Replaced by myEventbriteRegisteredEvents
-  const myRegisteredEvents = myEventbriteRegistrationsData?.events || [];
+  // (removed) Unused variables from removed queries
   
   // Filter events by date - show only upcoming events within the next 2 months
   const filterUpcomingEvents = (events: EventbriteEventData[]) => {
@@ -117,9 +87,7 @@ export default function EventsSection() {
   const upcomingEventbriteEvents = filteredUpcomingEvents.slice(0, 5);
 
 
-  const handleRegister = (eventId: number) => { // For internal events (if still used elsewhere)
-    registerMutation.mutate(eventId);
-  };
+  // (removed) Unused handler for internal events
 
   // const formatInternalEventPrice = (price: number) => { // For internal events (if still used elsewhere)
   //   return (price / 100).toLocaleString('en-US', {
@@ -147,7 +115,10 @@ export default function EventsSection() {
   };
 
   const formatDateForDisplay = (dateString: string | undefined | null, includeTime = true) => {
-    if (!dateString) return "Date TBD";
+    if (!dateString || dateString === 'null' || dateString === 'undefined') return "Date TBD";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "Date TBD";
+    
     const options: Intl.DateTimeFormatOptions = {
       month: 'long',
       day: 'numeric',
@@ -157,23 +128,29 @@ export default function EventsSection() {
       options.hour = 'numeric';
       options.minute = '2-digit';
     }
-    return new Date(dateString).toLocaleDateString('en-US', options);
+    return date.toLocaleDateString('en-US', options);
   };
 
   const formatTimeForDisplay = (dateString: string | undefined | null) => {
-    if (!dateString) return "";
-    return new Date(dateString).toLocaleTimeString('en-US', {
+    if (!dateString || dateString === 'null' || dateString === 'undefined') return "";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "";
+    
+    return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
     });
   };
 
   const formatEventDateRange = (startDate: string | undefined | null, endDate: string | undefined | null) => {
-    if (!startDate) return "Date TBD";
+    if (!startDate || startDate === 'null' || startDate === 'undefined') return "Date TBD";
     
     // Convert dates to Date objects for comparison
     const start = new Date(startDate);
-    const end = endDate ? new Date(endDate) : null;
+    if (isNaN(start.getTime())) return "Date TBD";
+    
+    const end = endDate && endDate !== 'null' && endDate !== 'undefined' ? new Date(endDate) : null;
+    if (end && isNaN(end.getTime())) return "Date TBD";
     
     // Check if dates are on the same day
     const isSameDay = end && 
@@ -208,7 +185,7 @@ export default function EventsSection() {
       <CardContent className="p-6 pt-2">
       <RegistrationsSection />
 
-        {/* Upcoming Events from Eventbrite (General) */}
+        {SHOW_UPCOMING && (
         <div>
           <h4 className="font-semibold text-muted-foreground mb-3">
             Upcoming Events (Next 2 Months)
@@ -291,13 +268,14 @@ export default function EventsSection() {
             </div>
           )}
         </div>
+        )}
         
         {/* The "View All Events" button might need to point to an internal page or Eventbrite org page */}
         <div className="mt-6 pt-4 border-t border-border">
           <Button className="w-full btn-primary" onClick={() => {
             const eventbriteOrgId = import.meta.env.VITE_EVENTBRITE_ORGANIZATION_ID;
             if (eventbriteOrgId) {
-                 window.open(`https://www.eventbrite.com/o/${eventbriteOrgId}`, "_blank");
+                 window.open(`https://laundryassociation.org/events-calendar/`, "_blank");
             } else {
                  toast({ title: "Cannot open Eventbrite page", description: "Eventbrite Organization ID not configured in environment variables (VITE_EVENTBRITE_ORGANIZATION_ID)."});
             }

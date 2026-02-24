@@ -16,7 +16,10 @@ export default function RegistrationsSection() {
   });
 
   const formatDateForDisplay = (dateString: string | undefined | null, includeTime = true) => {
-    if (!dateString) return "Date TBD";
+    if (!dateString || dateString === 'null' || dateString === 'undefined') return "Date TBD";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "Date TBD";
+    
     const options: Intl.DateTimeFormatOptions = {
       month: 'long',
       day: 'numeric',
@@ -26,23 +29,29 @@ export default function RegistrationsSection() {
       options.hour = 'numeric';
       options.minute = '2-digit';
     }
-    return new Date(dateString).toLocaleDateString('en-US', options);
+    return date.toLocaleDateString('en-US', options);
   };
 
   const formatTimeForDisplay = (dateString: string | undefined | null) => {
-    if (!dateString) return "";
-    return new Date(dateString).toLocaleTimeString('en-US', {
+    if (!dateString || dateString === 'null' || dateString === 'undefined') return "";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "";
+    
+    return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
     });
   };
 
   const formatEventDateRange = (startDate: string | undefined | null, endDate: string | undefined | null) => {
-    if (!startDate) return "Date TBD";
+    if (!startDate || startDate === 'null' || startDate === 'undefined') return "Date TBD";
     
     // Convert dates to Date objects for comparison
     const start = new Date(startDate);
-    const end = endDate ? new Date(endDate) : null;
+    if (isNaN(start.getTime())) return "Date TBD";
+    
+    const end = endDate && endDate !== 'null' && endDate !== 'undefined' ? new Date(endDate) : null;
+    if (end && isNaN(end.getTime())) return "Date TBD";
     
     // Check if dates are on the same day
     const isSameDay = end && 
@@ -119,10 +128,15 @@ export default function RegistrationsSection() {
     <div className="mb-8">
       <div className="space-y-4">
         {data.map((event: any) => {
-          // Find matching event from Eventbrite API data by name
-          const eventbriteEvent = eventbriteEvents?.events?.find(
-            (e: EventbriteEventData) => e.name.toLowerCase() === event.properties.event_name.toLowerCase()
-          );
+          // Find matching event from Eventbrite API data by name (safely)
+          const regName = typeof event?.properties?.event_name === 'string'
+            ? event.properties.event_name.trim().toLowerCase()
+            : null;
+          const eventbriteEvent = regName
+            ? eventbriteEvents?.events?.find((e: EventbriteEventData) =>
+                typeof e?.name === 'string' && e.name.trim().toLowerCase() === regName
+              )
+            : undefined;
 
           return (
             <div
