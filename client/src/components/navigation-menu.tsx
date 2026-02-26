@@ -20,7 +20,7 @@
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     return (
-      <nav className="bg-white border-b border-gray-200 shadow-sm">
+      <nav className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
         <div className="mx-auto">
           <div className="flex items-center justify-center lg:justify-between h-12 bg-[#1e4dd4]">
             {/* Desktop Navigation */}

@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import Header from "@/components/header";
 import NavigationMenu from "@/components/navigation-menu";
 import MembershipSection from "@/components/membership-section";
 import EventsSection from "@/components/events-section";
@@ -7,10 +6,26 @@ import QuickActions from "@/components/quick-actions";
 import ProfileEditModal from "@/components/profile-edit-modal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, CheckCircle, Users, Clock, Award, Bell, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  CalendarDays,
+  CheckCircle,
+  Users,
+  ArrowRight,
+  ExternalLink,
+  Clock3,
+  UserRoundPen,
+  CalendarClock,
+} from "lucide-react";
 import { useState, useEffect } from "react";
-import { getHubSpotDashboardData, type HubSpotDashboardData, getUserProfile, getMembership, getActivities } from "@/lib/api";
-import { displayValue, displayValueWithFallback } from "@/lib/utils";
+import {
+  getHubSpotDashboardData,
+  type HubSpotDashboardData,
+  getUserProfile,
+  getMembership,
+  getActivities,
+} from "@/lib/api";
+import { displayValue } from "@/lib/utils";
 import { useAuth } from '@/hooks/use-auth';
 
 export default function Dashboard() {
@@ -24,13 +39,13 @@ export default function Dashboard() {
     enabled: isAuthenticated, // Only fetch profile if authenticated
   });
 
-  const { data: legacyMembershipData, isLoading: isLoadingLegacyMembership } = useQuery<Awaited<ReturnType<typeof getMembership>>>({
+  const { data: legacyMembershipData } = useQuery<Awaited<ReturnType<typeof getMembership>>>({
     queryKey: ["legacyMembership"],
     queryFn: getMembership,
     enabled: isAuthenticated, // Only fetch membership if authenticated
   });
 
-  const { data: activitiesData, isLoading: isLoadingActivities } = useQuery<Awaited<ReturnType<typeof getActivities>>>({
+  const { data: activitiesData } = useQuery<Awaited<ReturnType<typeof getActivities>>>({
     queryKey: ["activities"],
     queryFn: getActivities,
     enabled: isAuthenticated, // Only fetch activities if authenticated
@@ -112,37 +127,72 @@ export default function Dashboard() {
     }
   };
 
+  const getSafeDate = (dateString?: string | null): Date | null => {
+    if (!dateString || dateString === 'null' || dateString === 'undefined') {
+      return null;
+    }
+    const parsedDate = new Date(dateString);
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+  };
+
+  const paidThroughDate = getSafeDate(hubSpotData?.contact?.membership_paid_through__c);
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const daysUntilRenewal = paidThroughDate
+    ? Math.ceil((paidThroughDate.getTime() - Date.now()) / msPerDay)
+    : null;
+
+  const memberStatus = displayValue(hubSpotData?.contact?.member_status) || "Unknown";
+  const isMembershipHealthy = daysUntilRenewal === null || daysUntilRenewal > 30;
+  const priorityActionLabel = isLoadingHubSpotDashboard
+    ? "Reviewing account status..."
+    : isMembershipHealthy
+      ? "Membership is in good standing"
+      : `Membership expires in ${daysUntilRenewal} days`;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+    <div className="min-h-screen bg-slate-100">
       {/* Navigation Menu */}
       <NavigationMenu />
       
-      {/* Enhanced Header with Gradient */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 text-white">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-xl cla-heading">CLA</span>
+      <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-blue-800 to-slate-900 text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(255,255,255,0.25),transparent_35%)]" />
+        <div className="relative max-w-7xl mx-auto px-6 py-10">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+                <Clock3 className="h-3.5 w-3.5" />
+                Member Command Center
               </div>
               <div>
-                <h1 className="uppercase text-3xl font-bold cla-heading text-white">Member Portal</h1>
-                <p className="text-blue-100 text-sm cla-body">Connect. Learn. Advocate.</p>
+                <h1 className="text-3xl font-bold cla-heading text-white md:text-4xl">
+                  Welcome back, {user?.firstName || "Member"}
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm text-blue-100 cla-body md:text-base">
+                  Manage your CLA membership, events, and profile details in one place.
+                </p>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                <span className="text-white font-semibold text-sm cla-heading">
+            <div className="flex items-center gap-3 self-start md:self-auto">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+                <span className="text-sm font-semibold text-white cla-heading">
                   {user.firstName?.[0]}{user.lastName?.[0]}
                 </span>
               </div>
+              <Button
+                variant="secondary"
+                className="bg-white/15 text-white hover:bg-white/25"
+                onClick={() => setIsProfileModalOpen(true)}
+              >
+                <UserRoundPen className="h-4 w-4 mr-2" />
+                Update Profile
+              </Button>
               <a
                 href="https://pages.laundryassociation.org/_hcms/logout?redirect_url=https://www.laundryassociation.org"
                 target="_self"
-                className="cursor-pointer hover:opacity-80 transition-opacity"
+                className="cursor-pointer rounded-md border border-white/30 bg-white/10 p-2 transition-colors hover:bg-white/20"
                 title="Sign out"
               >
-                <ExternalLink className="w-5 h-5 text-blue-200" />
+                <ExternalLink className="h-5 w-5 text-blue-100" />
               </a>
             </div>
           </div>
@@ -150,88 +200,136 @@ export default function Dashboard() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 shadow-lg p-8 mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2 cla-heading">
-            Welcome back, {user?.firstName || 'Guest'}!
-          </h2>
-          <p className="text-gray-600 text-lg cla-body">
-            Manage your CLA membership, profile, and events from your personalized dashboard.
-          </p>
-        </div>
-
-        {/* Enhanced Quick Stats with Gradients */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-gradient-to-br from-emerald-50 to-green-100 border-green-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-white" />
+        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Card className="border-slate-200 bg-white shadow-sm">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Membership Status</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">{isLoadingHubSpotDashboard ? "Loading..." : memberStatus}</p>
                 </div>
-                <div className="pl-1">
-                  <p className="text-sm font-medium text-green-700 cla-body">Membership Status</p>
-                  <p className="text-xl font-bold text-green-800 cla-heading">
-                    {isLoadingHubSpotDashboard ? 'Loading...' : displayValue(hubSpotData?.contact?.member_status)}
-                  </p>
+                <div className="rounded-full bg-emerald-100 p-2 text-emerald-700">
+                  <CheckCircle className="h-4 w-4" />
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
-                  <CalendarDays className="w-6 h-6 text-white" />
-                </div>
-                <div className="pl-1">
-                  <p className="text-sm font-medium text-blue-700 cla-body">Paid Through</p>
-                  <p className="text-xl font-bold text-blue-800 cla-heading">
-                    {isLoadingHubSpotDashboard ? 'Loading...' : formatDate(hubSpotData?.contact?.membership_paid_through__c)}
+          <Card className="border-slate-200 bg-white shadow-sm">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Paid Through</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">
+                    {isLoadingHubSpotDashboard ? "Loading..." : formatDate(hubSpotData?.contact?.membership_paid_through__c)}
                   </p>
+                </div>
+                <div className="rounded-full bg-blue-100 p-2 text-blue-700">
+                  <CalendarDays className="h-4 w-4" />
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          <Card className="bg-gradient-to-br from-purple-50 to-violet-100 border-purple-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
-                  <CalendarDays className="w-6 h-6 text-white" />
-                </div>
-                <div className="pl-1">
-                  <p className="text-sm font-medium text-purple-700 cla-body">Current Term Start</p>
-                  <p className="text-xl font-bold text-purple-800 cla-heading">
-                    {isLoadingHubSpotDashboard ? 'Loading...' : formatDate(hubSpotData?.contact?.current_term_start_date__c)}
+          <Card className="border-slate-200 bg-white shadow-sm">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Current Term Start</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">
+                    {isLoadingHubSpotDashboard ? "Loading..." : formatDate(hubSpotData?.contact?.current_term_start_date__c)}
                   </p>
+                </div>
+                <div className="rounded-full bg-indigo-100 p-2 text-indigo-700">
+                  <CalendarClock className="h-4 w-4" />
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          <Card className="bg-gradient-to-br from-amber-50 to-orange-100 border-orange-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <div className="pl-1">
-                  <p className="text-sm font-medium text-orange-700 cla-body">Member Since</p>
-                  <p className="text-xl font-bold text-orange-800 cla-heading">
-                    {isLoadingHubSpotDashboard ? 'Loading...' : formatDate(hubSpotData?.contact?.activated_date__c, { month: 'short', year: 'numeric' })}
+          <Card className="border-slate-200 bg-white shadow-sm">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Member Since</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">
+                    {isLoadingHubSpotDashboard ? "Loading..." : formatDate(hubSpotData?.contact?.activated_date__c, { month: "short", year: "numeric" })}
                   </p>
+                </div>
+                <div className="rounded-full bg-amber-100 p-2 text-amber-700">
+                  <Users className="h-4 w-4" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Content Grid with Enhanced Styling */}
+        <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <Card className="border-slate-200 bg-white shadow-sm lg:col-span-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between">
+                <span className="text-xl text-slate-900">Member Actions</span>
+                <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                  Recommended
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">{priorityActionLabel}</p>
+                  <p className="text-xs text-slate-600">Keep your benefits uninterrupted.</p>
+                </div>
+                <Button asChild className="btn-primary">
+                  <a href="#membership-section">
+                    Review Membership
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </a>
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Profile freshness check</p>
+                  <p className="text-xs text-slate-600">Make sure your company and contact details are current.</p>
+                </div>
+                <Button variant="outline" onClick={() => setIsProfileModalOpen(true)}>
+                  Update Profile
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Event readiness</p>
+                  <p className="text-xs text-slate-600">View your registrations and discover upcoming programs.</p>
+                </div>
+                <Button variant="outline" asChild>
+                  <a href="#events-section">
+                    Open Events
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-200 bg-white shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xl text-slate-900">Recent Activity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {activities.length > 0 ? (
+                <div className="space-y-3">
+                  {activities.slice(0, 3).map((activity, index) => (
+                    <div key={activity.id || index} className="rounded-lg border border-slate-200 p-3">
+                      <p className="text-sm text-slate-800">{activity.description}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-600">No recent activity yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Membership (Enhanced Container) */}
-          <div className="lg:col-span-2">
-            <div className="bg-white/80 backdrop-blur-sm border border-white/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-lg">
+          <div id="membership-section" className="lg:col-span-2 scroll-mt-20">
+            <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
               <MembershipSection
                 user={user}
                 membership={legacyMembership}
@@ -240,66 +338,15 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Right Column - Events & Quick Actions with Enhanced Styling */}
           <div className="space-y-6">
-            <div className="bg-white/80 backdrop-blur-sm border border-white/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-lg">
+            <div id="events-section" className="scroll-mt-20 rounded-lg border border-slate-200 bg-white shadow-sm">
               <EventsSection />
             </div>
-            <div className="bg-white/80 backdrop-blur-sm border border-white/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-lg">
+            <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
               <QuickActions />
             </div>
           </div>
         </div>
-
-        {/* Enhanced Recent Activity */}
-        {/* <div className="mt-8">
-          <Card className="bg-white/80 backdrop-blur-sm border border-white/50 shadow-xl hover:shadow-2xl transition-all duration-300">
-            <CardHeader className="bg-gradient-to-r from-gray-600 to-slate-700 text-white rounded-t-lg">
-              <CardTitle className="flex items-center space-x-2">
-                <Clock className="w-5 h-5" />
-                <span className="cla-heading">Recent Activity</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                {activities.length > 0 ? (
-                  activities.map((activity, index) => (
-                    <div key={activity.id || index} className="flex items-start space-x-3 py-3 border-b border-gray-100 last:border-b-0">
-                      <div className="w-8 h-8 bg-gradient-to-br from-green-100 to-emerald-200 rounded-full flex items-center justify-center flex-shrink-0">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900 cla-body">
-                          {activity.description}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1 cla-body">
-                          {activity.createdAt ? 
-                            new Date(activity.createdAt).toLocaleDateString('en-US', {
-                              month: 'long',
-                              day: 'numeric',
-                              year: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit'
-                            }) :
-                            'Recently'
-                          }
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Clock className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <p className="text-gray-500 cla-body">No recent activity to display</p>
-                    <p className="text-sm text-gray-400 mt-1 cla-body">Your activities will appear here as you use the portal</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div> */}
       </main>
 
       <ProfileEditModal 
