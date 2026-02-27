@@ -101,7 +101,7 @@ export default function Dashboard() {
     daysUntilExpiry: legacyMembershipData.membership.daysUntilExpiry === null ? undefined : legacyMembershipData.membership.daysUntilExpiry,
   } : undefined;
   const activities = activitiesData?.activities || [];
-  
+
   if (isLoadingProfile || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
@@ -118,7 +118,7 @@ export default function Dashboard() {
       </div>
     );
   }
-  
+
   const formatDate = (dateString?: string | null, options?: Intl.DateTimeFormatOptions) => {
     if (!dateString || dateString === 'null' || dateString === 'undefined') return '';
     try {
@@ -154,7 +154,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-slate-100">
       {/* Navigation Menu */}
       <NavigationMenu />
-      
+
       <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-blue-800 to-slate-900 text-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(255,255,255,0.25),transparent_35%)]" />
         <div className="relative max-w-7xl mx-auto px-6 py-10">
@@ -290,8 +290,9 @@ export default function Dashboard() {
                   <p className="text-sm font-semibold text-slate-900">Profile freshness check</p>
                   <p className="text-xs text-slate-600">Make sure your company and contact details are current.</p>
                 </div>
-                <Button variant="outline" onClick={() => setIsProfileModalOpen(true)}>
+                <Button className="btn-primary" onClick={() => setIsProfileModalOpen(true)}>
                   Update Profile
+                  <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
@@ -299,7 +300,7 @@ export default function Dashboard() {
                   <p className="text-sm font-semibold text-slate-900">Event readiness</p>
                   <p className="text-xs text-slate-600">View your registrations and discover upcoming programs.</p>
                 </div>
-                <Button variant="outline" asChild>
+                <Button asChild className="btn-primary">
                   <a href="#events-section">
                     Open Events
                     <ArrowRight className="h-4 w-4 ml-2" />
@@ -353,7 +354,7 @@ export default function Dashboard() {
         </div>
       </main>
 
-      <ProfileEditModal 
+      <ProfileEditModal
         user={user}
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
