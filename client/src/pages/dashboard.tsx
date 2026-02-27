@@ -45,6 +45,7 @@ export default function Dashboard() {
     enabled: isAuthenticated, // Only fetch membership if authenticated
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { data: activitiesData } = useQuery<Awaited<ReturnType<typeof getActivities>>>({
     queryKey: ["activities"],
     queryFn: getActivities,
@@ -161,7 +162,7 @@ export default function Dashboard() {
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
                 <Clock3 className="h-3.5 w-3.5" />
-                Member Command Center
+                Manage Your Membership
               </div>
               <div>
                 <h1 className="text-3xl font-bold cla-heading text-white md:text-4xl">
@@ -261,8 +262,8 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <Card className="border-slate-200 bg-white shadow-sm lg:col-span-2">
+        <div className="mb-8">
+          <Card className="border-slate-200 bg-white shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between">
                 <span className="text-xl text-slate-900">Member Actions</span>
@@ -307,6 +308,7 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
+          {/* Recent Activity — hidden until real activity data is available
           <Card className="border-slate-200 bg-white shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-xl text-slate-900">Recent Activity</CardTitle>
@@ -325,7 +327,9 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
+          */}
         </div>
+
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div id="membership-section" className="lg:col-span-2 scroll-mt-20">

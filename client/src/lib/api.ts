@@ -15,6 +15,18 @@ export interface HubSpotContactData {
   auto_renewal_request?: boolean | string | null;
 }
 
+export interface HubSpotSubscriptionData {
+  id: string;
+  name?: string | null;
+  // "active" | "past_due" | "canceled" | "expired" | "scheduled"
+  status?: string | null;
+  nextPaymentDate?: string | null;
+  lastPaymentAmount?: number | null;
+  billingFrequency?: string | null;
+  currencyCode?: string | null;
+  startDate?: string | null;
+}
+
 export interface HubSpotCompanyData {
   name?: string | null;
   membership_type?: string | null;
@@ -552,4 +564,73 @@ export async function fetchRegistrations(ids: string[]) {
   };
   const { data } = await axios.post(url, body);
   return data.results;
+}
+
+// --- HubSpot Subscription API ---
+
+const SUBSCRIPTION_PROPERTIES = [
+  "hs_name",
+  "hs_status",
+  "hs_next_payment_due_date",
+  "hs_last_payment_amount",
+  "hs_recurring_billing_frequency",
+  "hs_currency_code",
+  "hs_recurring_billing_start_date",
+].join(",");
+
+function mapSubscription(raw: any): HubSpotSubscriptionData {
+  const p = raw.properties || {};
+  return {
+    id: raw.id,
+    name: p.hs_name || null,
+    status: p.hs_status || null,
+    nextPaymentDate: p.hs_next_payment_due_date || null,
+    lastPaymentAmount: p.hs_last_payment_amount != null
+      ? parseFloat(p.hs_last_payment_amount)
+      : null,
+    billingFrequency: p.hs_recurring_billing_frequency || null,
+    currencyCode: p.hs_currency_code || null,
+    startDate: p.hs_recurring_billing_start_date || null,
+  };
+}
+
+export async function getContactSubscriptions(contactId: string): Promise<HubSpotSubscriptionData[]> {
+  // Step 1: get subscription IDs associated with this contact
+  const assocUrl = `${BASE}/crm/v3/objects/contacts/${contactId}/associations/subscriptions`;
+  const assocRes = await axios.get(assocUrl);
+  const results: Array<{ id: string }> = assocRes.data?.results ?? [];
+
+  if (results.length === 0) return [];
+
+  // Step 2: batch-read subscription details
+  const batchUrl = `${BASE}/crm/v3/objects/subscriptions/batch/read`;
+  const body = {
+    inputs: results.map((r) => ({ id: r.id })),
+    properties: SUBSCRIPTION_PROPERTIES.split(","),
+  };
+  const batchRes = await axios.post(batchUrl, body);
+  return (batchRes.data?.results ?? []).map(mapSubscription);
+}
+
+export async function cancelSubscription(subscriptionId: string): Promise<void> {
+  // HubSpot cancel endpoint — cancels at next renewal, not immediately
+  await axios.post(`${BASE}/crm/v3/objects/subscriptions/${subscriptionId}/cancel`);
+}
+
+// Mock subscriptions for local development (no HubSpot context)
+export function getMockSubscriptions(): HubSpotSubscriptionData[] {
+  const nextBilling = new Date();
+  nextBilling.setFullYear(nextBilling.getFullYear() + 1);
+  return [
+    {
+      id: "mock-sub-001",
+      name: "Annual Membership",
+      status: "active",
+      nextPaymentDate: nextBilling.toISOString(),
+      lastPaymentAmount: 250.00,
+      billingFrequency: "annually",
+      currencyCode: "USD",
+      startDate: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  ];
 }

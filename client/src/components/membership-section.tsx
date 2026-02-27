@@ -5,6 +5,16 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   CreditCard,
   AlertTriangle,
   Edit,
@@ -14,18 +24,27 @@ import {
   Calendar,
   Clock,
   CheckCircle,
-  Loader2, // For loading state
-  ServerCrash, // For error state
-  RefreshCw, // For auto-renewal
-  Check, // For success state
-  User as UserIcon, // For Individual Membership Information
-  Building2 // For Company Membership Information
+  Loader2,
+  ServerCrash,
+  RefreshCw,
+  Check,
+  Info,
+  User as UserIcon,
+  Building2
 } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getHubSpotDashboardData, updateAutoRenewalRequest, type HubSpotDashboardData } from "@/lib/api";
+import {
+  getHubSpotDashboardData,
+  updateAutoRenewalRequest,
+  cancelSubscription,
+  getContactSubscriptions,
+  getMockSubscriptions,
+  type HubSpotDashboardData,
+  type HubSpotSubscriptionData,
+} from "@/lib/api";
 import type { User, Membership } from "@shared/schema";
-import { Skeleton } from "@/components/ui/skeleton"; // For loading skeletons
+import { Skeleton } from "@/components/ui/skeleton";
 import { displayValue, displayValueWithFallback } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -42,6 +61,7 @@ interface MembershipSectionProps {
 export default function MembershipSection({ user, membership: initialMembership, onEditProfile }: MembershipSectionProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [localAutoRenewalRequest, setLocalAutoRenewalRequest] = useState(false);
+  const [showPreferencesDialog, setShowPreferencesDialog] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
@@ -93,6 +113,44 @@ export default function MembershipSection({ user, membership: initialMembership,
         variant: "destructive",
       });
       console.error('Auto-renewal request error:', error);
+    },
+  });
+
+  // Subscription query — falls back to mock data in local dev (no contactId)
+  const { data: subscriptions, isLoading: isLoadingSubscriptions } = useQuery<HubSpotSubscriptionData[]>({
+    queryKey: ['hubspotSubscriptions', user.hubspotContactId],
+    queryFn: () =>
+      user.hubspotContactId
+        ? getContactSubscriptions(user.hubspotContactId)
+        : Promise.resolve(getMockSubscriptions()),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const activeSubscription = subscriptions?.find(
+    (s) => s.status === 'active' || s.status === 'past_due'
+  ) ?? null;
+
+  // A stored payment method is inferred from having any subscription record at all
+  const hasStoredPaymentMethod = (subscriptions?.length ?? 0) > 0;
+
+  // Cancel/disable auto-renewal mutation
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelSubscription(activeSubscription!.id),
+    onSuccess: () => {
+      setShowPreferencesDialog(false);
+      queryClient.invalidateQueries({ queryKey: ['hubspotSubscriptions', user.hubspotContactId] });
+      queryClient.invalidateQueries({ queryKey: ['hubspotDashboardData', user.id] });
+      toast({
+        title: "Auto-renewal disabled",
+        description: "Your membership will not renew after the current term ends.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Update failed",
+        description: "Could not update your auto-renewal preference. Please try again or contact support.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -233,8 +291,8 @@ export default function MembershipSection({ user, membership: initialMembership,
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6 pt-2">
-        {/* Renewal Notice - using HubSpot membership_paid_through__c date */}
-        {!HIDE_RENEWAL_UI && renewalNeeded && !isAutoRenewalEnabled() && (
+        {/* Renewal Notice - only show amber alert when expiring and no auto-renewal set up */}
+        {!HIDE_RENEWAL_UI && renewalNeeded && !activeSubscription && !isAutoRenewalEnabled() && (
           <Alert className="mb-6 border-amber-200 bg-amber-50">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
             <AlertDescription className="text-amber-700">
@@ -250,43 +308,113 @@ export default function MembershipSection({ user, membership: initialMembership,
           </Alert>
         )}
 
-        {/* Auto-Renewal Confirmation Message */}
-        {!HIDE_RENEWAL_UI && renewalNeeded && isAutoRenewalEnabled() && (
+        {/* Auto-Renewal Confirmation Message — active subscription or legacy flag, expiring soon */}
+        {!HIDE_RENEWAL_UI && renewalNeeded && (activeSubscription || isAutoRenewalEnabled()) && (
           <Alert className="mb-6 border-green-200 bg-green-50">
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertDescription className="text-green-700">
               <div className="font-medium mb-1">Auto-Renewal Active</div>
               <p className="text-sm">
-                Your membership expires in {daysUntilExpiry} days, but don't worry! 
-                Your auto-renewal is enabled and your membership will be automatically renewed.
+                Your membership expires in {daysUntilExpiry} days, but don't worry —
+                your membership will automatically renew.
               </p>
             </AlertDescription>
           </Alert>
         )}
 
-        {/* Auto-Renewal Section */}
-        {!HIDE_RENEWAL_UI && !(renewalNeeded && isAutoRenewalEnabled()) && (
-          <div className="mb-6">
-            <div className="bg-muted rounded-lg p-4">
-              <div className="flex items-start justify-between">
+        {/* Auto-Renewal & Subscription Section */}
+        {!HIDE_RENEWAL_UI && (
+          <div className="mb-6 space-y-4">
+            {/* --- Active subscription panel --- */}
+            {isLoadingSubscriptions ? (
+              <Skeleton className="h-24 w-full rounded-lg" />
+            ) : activeSubscription ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex items-start space-x-3">
-                  <RefreshCw className={`h-5 w-5 mt-0.5 ${isAutoRenewalEnabled() ? 'text-green-600' : 'text-muted-foreground'}`} />
+                  <RefreshCw className="h-5 w-5 mt-0.5 text-green-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                      <h4 className="font-semibold text-secondary">
+                        {activeSubscription.name ?? 'Membership Subscription'}
+                      </h4>
+                      <Badge
+                        className={
+                          activeSubscription.status === 'active'
+                            ? 'bg-green-100 text-green-700 border-green-300'
+                            : 'bg-amber-100 text-amber-700 border-amber-300'
+                        }
+                      >
+                        {activeSubscription.status === 'active' ? 'Active' : 'Past Due'}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                      {activeSubscription.nextPaymentDate && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-0.5">Next Billing Date</p>
+                          <p className="font-medium text-secondary">
+                            {formatDate(activeSubscription.nextPaymentDate)}
+                          </p>
+                        </div>
+                      )}
+                      {activeSubscription.lastPaymentAmount != null && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-0.5">Amount</p>
+                          <p className="font-medium text-secondary">
+                            {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: activeSubscription.currencyCode ?? 'USD',
+                            }).format(activeSubscription.lastPaymentAmount)}
+                          </p>
+                        </div>
+                      )}
+                      {activeSubscription.billingFrequency && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-0.5">Frequency</p>
+                          <p className="font-medium text-secondary capitalize">
+                            {activeSubscription.billingFrequency}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
+                      <div className="flex items-center space-x-2 text-green-600">
+                        <Check className="h-4 w-4" />
+                        <span className="text-sm font-medium">Auto-renewal enabled</span>
+                      </div>
+                      <button
+                        onClick={() => setShowPreferencesDialog(true)}
+                        className="text-xs text-muted-foreground/60 hover:text-muted-foreground underline underline-offset-2 decoration-dotted transition-colors"
+                      >
+                        Manage preferences
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* --- No active subscription panel --- */
+              <div className="bg-muted rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <RefreshCw className={`h-5 w-5 mt-0.5 ${isAutoRenewalEnabled() ? 'text-green-600' : 'text-muted-foreground'} flex-shrink-0`} />
                   <div className="flex-1">
                     <h4 className="font-semibold text-secondary mb-1">Auto-Renewal</h4>
                     {isAutoRenewalEnabled() ? (
+                      /* Request already submitted — awaiting payment method */
                       <div className="space-y-2">
                         <p className="text-sm text-muted-foreground">
-                          Your membership will auto-renew, ensuring uninterrupted CLA benefits.
+                          Your auto-renewal preference has been noted. Auto-renewal will be
+                          activated when you complete your next membership payment.
                         </p>
                         <div className="flex items-center space-x-2 text-green-600">
                           <Check className="h-4 w-4" />
-                          <span className="text-sm font-medium">Auto-renewal enabled</span>
+                          <span className="text-sm font-medium">Request received</span>
                         </div>
                       </div>
-                    ) : (
+                    ) : hasStoredPaymentMethod ? (
+                      /* Has a payment method — full enable flow */
                       <div className="space-y-3">
                         <p className="text-sm text-muted-foreground">
-                          Enable auto-renewal to ensure you can enjoy your CLA membership benefits without interruption.
+                          Enable auto-renewal to keep your CLA membership active without interruption.
                         </p>
                         <Button
                           onClick={() => autoRenewalMutation.mutate()}
@@ -307,11 +435,43 @@ export default function MembershipSection({ user, membership: initialMembership,
                           )}
                         </Button>
                       </div>
+                    ) : (
+                      /* No payment method on file */
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Enable auto-renewal to keep your CLA membership active without interruption.
+                        </p>
+                        <div className="flex items-start space-x-2 text-muted-foreground bg-background rounded p-3 border border-border">
+                          <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs">
+                            Auto-renewal requires a payment method on file. Your card will be
+                            saved automatically when you complete your next renewal payment.
+                          </p>
+                        </div>
+                        <Button
+                          onClick={() => autoRenewalMutation.mutate()}
+                          disabled={autoRenewalMutation.isPending}
+                          className="btn-primary"
+                          size="sm"
+                        >
+                          {autoRenewalMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Submitting...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Request Auto-Renewal
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -521,6 +681,39 @@ export default function MembershipSection({ user, membership: initialMembership,
           </div>
         </div>
       </CardContent>
+
+      {/* Auto-Renewal Preferences dialog */}
+      <AlertDialog open={showPreferencesDialog} onOpenChange={setShowPreferencesDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Auto-Renewal Preferences</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your membership is currently set to auto-renew on{' '}
+              <strong>{formatDate(activeSubscription?.nextPaymentDate)}</strong>.
+              If you disable auto-renewal, your membership will remain active through{' '}
+              <strong>{formatDate(hubSpotData?.contact?.membership_paid_through__c)}</strong>{' '}
+              but will not renew after that date.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Auto-Renewal</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => cancelMutation.mutate()}
+              disabled={cancelMutation.isPending}
+            >
+              {cancelMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Disabling...
+                </>
+              ) : (
+                'Disable Auto-Renewal'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
