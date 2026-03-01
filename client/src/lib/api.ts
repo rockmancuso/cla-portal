@@ -56,6 +56,73 @@ export interface EventbriteEventsResponse {
   message?: string; // Optional message, e.g., for errors or API status
 }
 
+// WordPress / The Events Calendar types for portal event display
+export interface WordPressEventVenue {
+  venue: string;            // Venue name
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+  url?: string;
+  google_maps_link?: string;
+}
+
+export interface WordPressEventOrganizer {
+  organizer: string;        // Organizer name
+  phone?: string;
+  email?: string;
+  website?: string;
+  url?: string;             // TEC organizer page URL
+}
+
+export interface WordPressEvent {
+  id: number;
+  slug: string;
+  title: string;
+  description: string;
+  url: string;              // WordPress permalink (canonical event URL)
+  startDate: string;        // ISO 8601
+  endDate: string;          // ISO 8601
+  startDateDetails: { year: string; month: string; day: string; hour: string; minutes: string };
+  endDateDetails: { year: string; month: string; day: string; hour: string; minutes: string };
+  utcStartDate: string;
+  utcEndDate: string;
+  imageUrl: string | null;
+  venue: WordPressEventVenue | null;
+  organizer: WordPressEventOrganizer | null;
+  categories: string[];
+  eventbriteId: string | null;  // Eventbrite Event ID from custom meta
+  status: string;
+}
+
+// Registration record from HubSpot custom object (enriched with new sync properties)
+export interface RegistrationRecord {
+  id: string;
+  properties: {
+    event_name: string;
+    registration_date?: string;
+    event_start_date?: string;
+    event_end_date?: string;
+    event_url?: string;
+    venue_name?: string;
+    event_status?: string;     // registered | checked_in | cancelled | refunded
+    is_free?: string | boolean;
+    event_location?: string;
+    eb_attendee_email?: string;
+    attendee_number?: string;
+    // New properties from sync Lambda
+    eventbrite_event_id?: string;
+    eventbrite_attendee_id?: string;
+    wordpress_event_url?: string;
+    eb_ticket_type?: string;
+    eb_ticket_price?: string;
+    eb_purchase_amount?: string;
+    eb_quantity_purchased?: string;
+    eb_order_date?: string;
+  };
+}
+
 export async function apiRequest(
   method: string,
   url: string,
@@ -145,11 +212,75 @@ export async function getHubSpotDashboardData(): Promise<HubSpotDashboardData> {
   };
 }
 
-// Eventbrite API integration
+// WordPress / The Events Calendar REST API integration
+// Fetches upcoming events from WordPress (the canonical event source)
+const WP_API_BASE = import.meta.env.VITE_WP_API_BASE || 'https://laundryassociation.org/wp-json';
+
+export async function getUpcomingEvents(): Promise<WordPressEvent[]> {
+  try {
+    const response = await fetch(
+      `${WP_API_BASE}/tribe/events/v1/events/?per_page=10&start_date=now&status=publish`,
+      { headers: { 'Accept': 'application/json' } }
+    );
+
+    if (!response.ok) {
+      throw new Error(`WordPress API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const events: WordPressEvent[] = (data.events || []).map((event: any) => ({
+      id: event.id,
+      slug: event.slug || '',
+      title: event.title || 'Untitled Event',
+      description: event.excerpt || event.description || '',
+      url: event.url || '',
+      startDate: event.start_date || '',
+      endDate: event.end_date || '',
+      startDateDetails: event.start_date_details || {},
+      endDateDetails: event.end_date_details || {},
+      utcStartDate: event.utc_start_date || event.start_date || '',
+      utcEndDate: event.utc_end_date || event.end_date || '',
+      imageUrl: event.image?.url || null,
+      venue: event.venue ? {
+        venue: event.venue.venue || '',
+        address: event.venue.address || '',
+        city: event.venue.city || '',
+        state: event.venue.state || '',
+        zip: event.venue.zip || '',
+        country: event.venue.country || '',
+        url: event.venue.url || undefined,
+        google_maps_link: event.venue.google_maps_link || undefined,
+      } : null,
+      organizer: event.organizer?.[0] ? {
+        organizer: event.organizer[0].organizer || '',
+        phone: event.organizer[0].phone || undefined,
+        email: event.organizer[0].email || undefined,
+        website: event.organizer[0].website || undefined,
+        url: event.organizer[0].url || undefined,
+      } : null,
+      categories: (event.categories || []).map((c: any) => c.name || c),
+      eventbriteId: event.eventbrite_event_id || null,
+      status: event.status || 'publish',
+    }));
+
+    return events;
+  } catch (error) {
+    console.error('Error fetching events from WordPress:', error);
+    return [];
+  }
+}
+
+// Legacy Eventbrite API integration (kept for backward compatibility during migration)
+// TODO: Remove after WordPress REST API is fully configured with CORS
 export async function getEventbriteEvents(): Promise<EventbriteEventsResponse> {
-  const EVENTBRITE_TOKEN = import.meta.env.VITE_EVENTBRITE_PRIVATE_TOKEN || '2YLXYH56CRFQHC36DIPU';
+  const EVENTBRITE_TOKEN = import.meta.env.VITE_EVENTBRITE_PRIVATE_TOKEN;
   const EVENTBRITE_ORG_ID = import.meta.env.VITE_EVENTBRITE_ORGANIZATION_ID || '2140213592673';
-  
+
+  if (!EVENTBRITE_TOKEN) {
+    console.warn('Eventbrite token not configured. Use getUpcomingEvents() (WordPress API) instead.');
+    return { events: [], message: 'Eventbrite token not configured' };
+  }
+
   try {
     const response = await fetch(
       `https://www.eventbriteapi.com/v3/organizations/${EVENTBRITE_ORG_ID}/events/?status=live&time_filter=current_future&order_by=start_asc&expand=venue`,
@@ -166,15 +297,13 @@ export async function getEventbriteEvents(): Promise<EventbriteEventsResponse> {
       console.error('Eventbrite API Response:', {
         status: response.status,
         statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
         body: errorText
       });
-      throw new Error(`Eventbrite API error: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(`Eventbrite API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    
-    // Transform Eventbrite API response to match our EventbriteEventData interface
+
     const events: EventbriteEventData[] = data.events?.map((event: any) => ({
       id: event.id,
       name: event.name?.text || event.name || 'Untitled Event',
@@ -194,8 +323,6 @@ export async function getEventbriteEvents(): Promise<EventbriteEventsResponse> {
     };
   } catch (error) {
     console.error('Error fetching Eventbrite events:', error);
-    
-    // Return empty array on error since direct API calls are working
     return {
       events: [],
       message: `Error loading events: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -546,7 +673,7 @@ export async function fetchRegistrationIds(contactId: string) {
   return data.results.map((r: { id: string }) => r.id) as string[];
 }
 
-export async function fetchRegistrations(ids: string[]) {
+export async function fetchRegistrations(ids: string[]): Promise<RegistrationRecord[]> {
   if (!ids.length) return [];
   const url = `${BASE}/crm/v3/objects/p19544225_eventbrite_registrations/batch/read`;
   const body = {
@@ -559,7 +686,19 @@ export async function fetchRegistrations(ids: string[]) {
       "event_url",
       "venue_name",
       "event_status",
-      "is_free"
+      "is_free",
+      "event_location",
+      "eb_attendee_email",
+      "attendee_number",
+      // New properties from sync Lambda
+      "eventbrite_event_id",
+      "eventbrite_attendee_id",
+      "wordpress_event_url",
+      "eb_ticket_type",
+      "eb_ticket_price",
+      "eb_purchase_amount",
+      "eb_quantity_purchased",
+      "eb_order_date",
     ]
   };
   const { data } = await axios.post(url, body);

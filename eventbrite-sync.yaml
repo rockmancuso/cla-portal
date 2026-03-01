@@ -1,0 +1,183 @@
+# CloudFormation template for Eventbrite ↔ HubSpot sync Lambda
+# Deploy alongside the existing hubspot-proxy stack
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Eventbrite webhook sync to HubSpot custom objects + nightly reconciliation'
+
+Parameters:
+  HubSpotAccessToken:
+    Type: String
+    Description: HubSpot Private App Access Token
+    NoEcho: true
+  EventbriteToken:
+    Type: String
+    Description: Eventbrite Private API Token
+    NoEcho: true
+  WebhookSecret:
+    Type: String
+    Description: Secret token for webhook URL path verification
+    NoEcho: true
+  WordPressApiBase:
+    Type: String
+    Description: WordPress REST API base URL
+    Default: 'https://laundryassociation.org/wp-json'
+  EventbriteOrgId:
+    Type: String
+    Description: Eventbrite Organization ID
+    Default: '2140213592673'
+  EbCustomQCompany:
+    Type: String
+    Description: Eventbrite question ID for Company Name
+    Default: ''
+  EbCustomQMobile:
+    Type: String
+    Description: Eventbrite question ID for Mobile Number
+    Default: ''
+  EbCustomQAddress:
+    Type: String
+    Description: Eventbrite question ID for Mailing Address
+    Default: ''
+  EbCustomQIndivType:
+    Type: String
+    Description: Eventbrite question ID for Individual Type
+    Default: ''
+  ExistingApiGatewayId:
+    Type: String
+    Description: Existing API Gateway ID (from hubspot-proxy stack)
+  ExistingApiGatewayRootResourceId:
+    Type: String
+    Description: Existing API Gateway root resource ID
+
+Resources:
+  # Lambda execution role
+  EventbriteSyncRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # Lambda function
+  EventbriteSyncLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: eventbrite-sync
+      Runtime: nodejs18.x
+      Handler: index.handler
+      Timeout: 60
+      MemorySize: 256
+      Role: !GetAtt EventbriteSyncRole.Arn
+      Environment:
+        Variables:
+          HUBSPOT_ACCESS_TOKEN: !Ref HubSpotAccessToken
+          EVENTBRITE_TOKEN: !Ref EventbriteToken
+          WEBHOOK_SECRET: !Ref WebhookSecret
+          WP_API_BASE: !Ref WordPressApiBase
+          EVENTBRITE_ORG_ID: !Ref EventbriteOrgId
+          EB_CUSTOM_Q_COMPANY: !Ref EbCustomQCompany
+          EB_CUSTOM_Q_MOBILE: !Ref EbCustomQMobile
+          EB_CUSTOM_Q_ADDRESS: !Ref EbCustomQAddress
+          EB_CUSTOM_Q_INDIV_TYPE: !Ref EbCustomQIndivType
+      Code:
+        S3Bucket: !Sub 'cla-lambda-deployments'
+        S3Key: 'eventbrite-sync.zip'
+
+  # API Gateway resource: /eventbrite-webhook/{secret}
+  WebhookResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ExistingApiGatewayId
+      ParentId: !Ref ExistingApiGatewayRootResourceId
+      PathPart: 'eventbrite-webhook'
+
+  WebhookSecretResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ExistingApiGatewayId
+      ParentId: !Ref WebhookResource
+      PathPart: '{secret}'
+
+  # POST method for webhook
+  WebhookMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ExistingApiGatewayId
+      ResourceId: !Ref WebhookSecretResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.secret: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EventbriteSyncLambda.Arn}/invocations'
+
+  # OPTIONS method for CORS
+  WebhookOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ExistingApiGatewayId
+      ResourceId: !Ref WebhookSecretResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EventbriteSyncLambda.Arn}/invocations'
+
+  # Lambda permission for API Gateway
+  WebhookLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EventbriteSyncLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ExistingApiGatewayId}/*/*'
+
+  # Redeploy API Gateway after adding new resources
+  WebhookDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - WebhookMethod
+      - WebhookOptionsMethod
+    Properties:
+      RestApiId: !Ref ExistingApiGatewayId
+      StageName: prod
+
+  # EventBridge rule for nightly reconciliation (02:00 UTC)
+  ReconciliationSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: eventbrite-nightly-reconciliation
+      Description: 'Nightly Eventbrite ↔ HubSpot registration reconciliation'
+      ScheduleExpression: 'cron(0 2 * * ? *)'
+      State: ENABLED
+      Targets:
+        - Id: EventbriteSyncTarget
+          Arn: !GetAtt EventbriteSyncLambda.Arn
+          Input: '{"action":"reconcile","source":"aws.events"}'
+
+  # Lambda permission for EventBridge
+  ReconciliationLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EventbriteSyncLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ReconciliationSchedule.Arn
+
+Outputs:
+  WebhookEndpoint:
+    Description: 'Eventbrite webhook URL (replace {your-secret} with the actual secret)'
+    Value: !Sub 'https://${ExistingApiGatewayId}.execute-api.${AWS::Region}.amazonaws.com/prod/eventbrite-webhook/{your-secret}'
+  LambdaFunctionArn:
+    Description: 'Eventbrite Sync Lambda ARN'
+    Value: !GetAtt EventbriteSyncLambda.Arn
+  ReconciliationRuleArn:
+    Description: 'Nightly reconciliation EventBridge rule ARN'
+    Value: !GetAtt ReconciliationSchedule.Arn
