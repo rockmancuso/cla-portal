@@ -262,6 +262,15 @@ async function upsertRegistration(attendee, eventData, order, statusOverride) {
     props.event_url = eventData?.url || "";
   }
 
+  // Look up HubSpot contact by attendee's own email (not purchaser's)
+  const contactId = await findHubSpotContactByEmail(email);
+  if (!contactId) {
+    console.warn(
+      `No HubSpot contact found for attendee ${attendeeId} (${email}), skipping`
+    );
+    return;
+  }
+
   // Search for existing registration by attendee ID (idempotency)
   const existing = await searchHubSpotRegistrations(
     "eventbrite_attendee_id",
@@ -275,18 +284,14 @@ async function upsertRegistration(attendee, eventData, order, statusOverride) {
     );
     await updateHubSpotObject(existing[0].id, props);
   } else {
-    // CREATE new record
-    console.log(`Creating new registration for attendee ${attendeeId}`);
+    // CREATE new record linked to the attendee's own contact
+    console.log(
+      `Creating new registration for attendee ${attendeeId} (${email}), contact ${contactId}`
+    );
     const newReg = await createHubSpotObject(props);
 
-    // Associate with contact
     if (newReg?.id) {
-      const contactId = await findHubSpotContactByEmail(email);
-      if (contactId) {
-        await associateRegistrationWithContact(newReg.id, contactId);
-      } else {
-        console.warn(`No HubSpot contact found for ${email}`);
-      }
+      await associateRegistrationWithContact(newReg.id, contactId);
     }
   }
 }
@@ -525,8 +530,8 @@ async function hubspotRequest(method, url, body) {
 async function lookupWordPressEventUrl(eventbriteEventId) {
   if (!eventbriteEventId) return null;
 
-  // Search for tribe_events with matching _eventbrite_event_id meta
-  const url = `${WP_API_BASE}/tribe/events/v1/events/?per_page=1&meta_key=_eventbrite_event_id&meta_value=${eventbriteEventId}`;
+  // Use CLA plugin's custom endpoint for lookup by Eventbrite Event ID
+  const url = `${WP_API_BASE}/cla/v1/events/by-eventbrite-id/${eventbriteEventId}`;
 
   try {
     const result = await httpRequest(url, {
@@ -536,8 +541,8 @@ async function lookupWordPressEventUrl(eventbriteEventId) {
 
     if (result.statusCode === 200) {
       const data = JSON.parse(result.body);
-      if (data?.events?.[0]?.url) {
-        return data.events[0].url;
+      if (data?.event?.url) {
+        return data.event.url;
       }
     }
   } catch (err) {
