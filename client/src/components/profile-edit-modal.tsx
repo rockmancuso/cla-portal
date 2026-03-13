@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +14,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateUserProfile } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
-import { User as UserIcon, UserRound, Phone, MapPin, Building2, Save, X } from "lucide-react";
+import { User as UserIcon, UserRound, Phone, MapPin, Building2, Save, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface ProfileEditModalProps {
     user: User;
@@ -85,6 +85,18 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
 
     const handleInputChange = (field: string, value: string | number | boolean) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    const scrollLaundries = (direction: 'left' | 'right') => {
+        if (scrollRef.current) {
+            const scrollAmount = 200;
+            scrollRef.current.scrollBy({
+                left: direction === 'left' ? -scrollAmount : scrollAmount,
+                behavior: 'smooth'
+            });
+        }
     };
 
     const showStateField = formData.country === 'United States';
@@ -162,16 +174,46 @@ export default function ProfileEditModal({ user, isOpen, onClose }: ProfileEditM
                                 Business & Contact
                             </h3>
 
-                            <div className="space-y-2 mb-6">
+                            <div className="space-y-3 mb-6">
                                 <Label htmlFor="totalLaundries" className="text-sm font-semibold text-slate-700">Total # of Laundries</Label>
-                                <Input
-                                    id="totalLaundries"
-                                    type="number"
-                                    min="0"
-                                    value={formData.totalLaundries}
-                                    onChange={(e) => handleInputChange('totalLaundries', parseInt(e.target.value) || 0)}
-                                    className="focus:ring-2 focus:ring-primary focus:border-transparent bg-slate-50 hover:bg-white transition-colors !rounded-md !border-slate-200 shadow-sm max-w-xs"
-                                />
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => scrollLaundries('left')}
+                                        className="h-10 w-10 flex items-center justify-center rounded-full bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors flex-shrink-0"
+                                        aria-label="Scroll left"
+                                    >
+                                        <ChevronLeft className="h-5 w-5" />
+                                    </button>
+
+                                    <div
+                                        ref={scrollRef}
+                                        className="flex overflow-x-auto pb-4 pt-2 gap-2 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent flex-1"
+                                    >
+                                        {Array.from({ length: 100 }, (_, i) => i + 1).map((num) => (
+                                            <button
+                                                key={num}
+                                                type="button"
+                                                onClick={() => handleInputChange('totalLaundries', num)}
+                                                className={`flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-sm font-medium transition-colors border ${formData.totalLaundries === num
+                                                    ? 'bg-blue-600 border-blue-600 text-white shadow-md'
+                                                    : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-slate-50'
+                                                    }`}
+                                            >
+                                                {num}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => scrollLaundries('right')}
+                                        className="h-10 w-10 flex items-center justify-center rounded-full bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors flex-shrink-0"
+                                        aria-label="Scroll right"
+                                    >
+                                        <ChevronRight className="h-5 w-5" />
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

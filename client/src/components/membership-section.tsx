@@ -30,7 +30,14 @@ import {
   Check,
   Info,
   User as UserIcon,
-  Building2
+  Building2,
+  BarChart3,
+  Users,
+  Tag,
+  Shield,
+  TrendingUp,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -52,13 +59,13 @@ import { useToast } from "@/hooks/use-toast";
 const HIDE_RENEWAL_UI = import.meta.env.VITE_HIDE_RENEWAL_UI === 'true';
 
 interface MembershipSectionProps {
-  user: User; // Keep user prop for now, might contain other relevant info
-  // membership prop might be deprecated or used as fallback if HubSpot data fails
+  user: User;
   membership?: Membership & { daysUntilExpiry?: number; renewalNeeded?: boolean };
   onEditProfile: () => void;
+  isActiveMember: boolean;
 }
 
-export default function MembershipSection({ user, membership: initialMembership, onEditProfile }: MembershipSectionProps) {
+export default function MembershipSection({ user, membership: initialMembership, onEditProfile, isActiveMember }: MembershipSectionProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [localAutoRenewalRequest, setLocalAutoRenewalRequest] = useState(false);
   const [showPreferencesDialog, setShowPreferencesDialog] = useState(false);
@@ -252,6 +259,137 @@ export default function MembershipSection({ user, membership: initialMembership,
     );
   }
   
+  // Non-member early return — show benefits showcase instead of member content
+  if (!isActiveMember) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center text-xl font-semibold text-secondary">
+            <CreditCard className="h-5 w-5 text-primary mr-3" />
+            CLA Membership
+            <Badge className="ml-3 bg-slate-100 text-slate-600 border-slate-200">
+              Non-Member
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6 pt-2">
+          {/* Join CTA Alert */}
+          <Alert className="mb-6 border-blue-200 bg-blue-50">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-700">
+              <div className="font-medium mb-1">You are not currently a CLA member</div>
+              <p className="text-sm mb-3">
+                Join CLA to access exclusive industry resources, networking
+                events, discounts, and more.
+              </p>
+              <Button asChild size="sm" className="btn-accent">
+                <a href="https://laundryassociation.org/membership/join/" target="_blank" rel="noopener noreferrer">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Join CLA Today
+                </a>
+              </Button>
+            </AlertDescription>
+          </Alert>
+
+          {/* Benefits Grid */}
+          <h3 className="font-semibold text-secondary text-lg mb-4">Membership Benefits</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="bg-muted rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-blue-100 p-2 text-blue-600 flex-shrink-0">
+                  <BarChart3 className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-secondary text-sm">Industry Insights</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Access the State of the Industry Survey, white papers, Full Cycle magazine, and
+                    professional training resources.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-muted rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-emerald-100 p-2 text-emerald-600 flex-shrink-0">
+                  <Users className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-secondary text-sm">Networking</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Connect at CLA Connect LIVE, national events, and the Women's Laundry Network
+                    for peer-to-peer learning.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-muted rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-amber-100 p-2 text-amber-600 flex-shrink-0">
+                  <Tag className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-secondary text-sm">Exclusive Discounts</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Save with CLAdvantage Rewards, insurance programs, marketing resources, and
+                    member-only pricing.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-muted rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-indigo-100 p-2 text-indigo-600 flex-shrink-0">
+                  <Shield className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-secondary text-sm">Industry Advocacy</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    CLA advocates for the laundry industry at the federal and state level to protect
+                    and advance your business.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Revenue Highlight */}
+          <div className="rounded-lg border-l-4 border-emerald-500 bg-emerald-50 p-4 mb-6">
+            <div className="flex items-center gap-3">
+              <TrendingUp className="h-5 w-5 text-emerald-600 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-emerald-800">
+                  CLA members report <span className="text-emerald-600">$200K more per year</span> in revenue on average
+                </p>
+                <p className="text-xs text-emerald-700 mt-0.5">Based on CLA member survey data</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-3">
+            <Button asChild className="btn-accent">
+              <a href="https://laundryassociation.org/membership/join/" target="_blank" rel="noopener noreferrer">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Join CLA Today
+              </a>
+            </Button>
+            <Button onClick={onEditProfile} className="btn-primary">
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Profile
+            </Button>
+            <Button variant="outline" asChild>
+              <a href="https://laundryassociation.org/membership/benefits/" target="_blank" rel="noopener noreferrer">
+                <Gift className="h-4 w-4 mr-2" />
+                View All Benefits
+                <ArrowRight className="h-4 w-4 ml-1" />
+              </a>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Helper function to safely create and validate dates
   const createSafeDate = (dateString?: string | null): Date | null => {
     if (!dateString || dateString === 'null' || dateString === 'undefined' || dateString === '') {
