@@ -6,6 +6,7 @@ import { getUpcomingEvents, type WordPressEvent } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import RegistrationsSection from "@/components/registrations-section";
+import { decodeHTMLEntities } from "@/lib/utils";
 
 export default function EventsSection() {
   const SHOW_UPCOMING = true;
@@ -96,9 +97,8 @@ export default function EventsSection() {
   const getVenueDisplay = (event: WordPressEvent) => {
     if (!event.venue) return "Location TBD";
     const { venue: name, city, state } = event.venue;
-    if (city && state) return `${name} — ${city}, ${state}`;
-    if (city) return `${name} — ${city}`;
-    return name || "Location TBD";
+    const result = city && state ? `${name} — ${city}, ${state}` : city ? `${name} — ${city}` : name || "Location TBD";
+    return decodeHTMLEntities(result);
   };
 
   return (
@@ -157,7 +157,7 @@ export default function EventsSection() {
                       >
                         <div className="flex items-start justify-between mb-2">
                           <h3 className="text-sm font-medium text-foreground line-clamp-2">
-                            {event.title}
+                            {decodeHTMLEntities(event.title)}
                           </h3>
                           {event.categories.length > 0 && (
                             <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded ml-2 flex-shrink-0">

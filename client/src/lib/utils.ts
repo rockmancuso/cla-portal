@@ -37,6 +37,16 @@ const ACTIVE_MEMBER_STATUSES = ['current'];
  * Checks whether a contact is an active CLA member based on their HubSpot member_status.
  * Returns true only for known active statuses (case-insensitive).
  */
+/**
+ * Decodes HTML entities (e.g. &#8211; → –) in a string.
+ * Useful for text from WordPress APIs that contains encoded characters.
+ */
+export function decodeHTMLEntities(text: string): string {
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = text;
+  return textarea.value;
+}
+
 export function isMember(memberStatus: string | null | undefined): boolean {
   if (!memberStatus || memberStatus === 'null' || memberStatus === 'undefined') {
     return false;

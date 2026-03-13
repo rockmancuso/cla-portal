@@ -5,6 +5,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { CalendarDays, MapPin, Globe, ExternalLink } from "lucide-react";
 import type { RegistrationRecord } from "@/lib/api";
+import { decodeHTMLEntities } from "@/lib/utils";
 
 const EVENTS_CALENDAR_URL = "https://laundryassociation.org/events/";
 
@@ -170,7 +171,7 @@ export default function RegistrationsSection() {
             >
               <div className="flex items-start justify-between">
                 <h3 className={`text-sm font-medium line-clamp-2 ${inactive ? "text-muted-foreground line-through" : "text-foreground"}`}>
-                  {props.event_name}
+                  {decodeHTMLEntities(props.event_name)}
                 </h3>
                 <RegistrationStatusBadge status={props.event_status} />
               </div>
@@ -186,11 +187,13 @@ export default function RegistrationsSection() {
                     ) : (
                       <MapPin className="h-3 w-3 mr-2" />
                     )}
-                    {props.venue_name
-                      ? props.event_location && !props.event_location.toLowerCase().includes("online")
-                        ? `${props.venue_name} — ${props.event_location}`
-                        : props.venue_name
-                      : props.event_location || "Location TBD"}
+                    {decodeHTMLEntities(
+                      props.venue_name
+                        ? props.event_location && !props.event_location.toLowerCase().includes("online")
+                          ? `${props.venue_name} — ${props.event_location}`
+                          : props.venue_name
+                        : props.event_location || "Location TBD"
+                    )}
                   </div>
                 )}
                 {props.eb_ticket_type && (
