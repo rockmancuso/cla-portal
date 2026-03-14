@@ -156,7 +156,7 @@ export default function EventsSection() {
                         className="border border-border rounded-lg p-4"
                       >
                         <div className="flex items-start justify-between mb-2">
-                          <h3 className="text-sm font-medium text-foreground line-clamp-2">
+                          <h3 className="text-sm font-medium text-foreground line-clamp-2 min-w-0">
                             {decodeHTMLEntities(event.title)}
                           </h3>
                           {event.categories.length > 0 && (

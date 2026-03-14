@@ -27,6 +27,22 @@ export function displayValueWithFallback(value: string | null | undefined, fallb
 }
 
 /**
+ * Normalizes HubSpot checkbox-style values into a boolean.
+ */
+export function parseHubSpotCheckbox(value: unknown): boolean {
+  if (value === true) {
+    return true;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return ["true", "yes", "1", "on"].includes(normalized);
+  }
+
+  return false;
+}
+
+/**
  * Allowlist of HubSpot member_status values that indicate an active membership.
  * HubSpot uses 'current' for active members and 'lapsed' for inactive.
  * Any unknown, null, or new status safely defaults to non-member.

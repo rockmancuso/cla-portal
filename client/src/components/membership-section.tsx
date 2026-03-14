@@ -52,8 +52,9 @@ import {
 } from "@/lib/api";
 import type { User, Membership } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
-import { displayValue, displayValueWithFallback } from "@/lib/utils";
+import { displayValue, displayValueWithFallback, parseHubSpotCheckbox } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import React from 'react';
 
 // Feature flag: hide renewal and auto-renewal UI when enabled (Vite replaces this at build time)
 const HIDE_RENEWAL_UI = import.meta.env.VITE_HIDE_RENEWAL_UI === 'true';
@@ -78,29 +79,10 @@ export default function MembershipSection({ user, membership: initialMembership,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Helper function to check if auto-renewal is enabled (either property)
-  const isAutoRenewalEnabled = () => {
-    // Handle string "null" values from HubSpot personalization tokens
-    const autoRenewingValue = hubSpotData?.contact?.auto_renewing_;
-    const autoRenewalRequestValue = hubSpotData?.contact?.auto_renewal_request;
-    
-    // Convert to boolean, handling string "null", "true", "false", "Yes" and actual boolean values
-    const autoRenewing = autoRenewingValue === true || autoRenewingValue === "true" || autoRenewingValue === "Yes";
-    const autoRenewalRequest = autoRenewalRequestValue === true || autoRenewalRequestValue === "true";
-    const localRequest = localAutoRenewalRequest;
-    
-    // Debug logging
-    console.log('Auto-renewal debug:', {
-      autoRenewing,
-      autoRenewalRequest,
-      localRequest,
-      rawAutoRenewing: autoRenewingValue,
-      rawAutoRenewalRequest: autoRenewalRequestValue,
-      hubSpotData: hubSpotData?.contact
-    });
-    
-    return autoRenewing || autoRenewalRequest || localRequest;
-  };
+  const isCurrentlyOnAutoRenewal = parseHubSpotCheckbox(hubSpotData?.contact?.on_auto_renewal);
+  const hasRequestedAutoRenewal =
+    parseHubSpotCheckbox(hubSpotData?.contact?.auto_renewal_request) || localAutoRenewalRequest;
+  const hasStoredPaymentInfo = parseHubSpotCheckbox(hubSpotData?.contact?.has_stored_payment_info);
 
   // Auto-renewal mutation
   const autoRenewalMutation = useMutation({
@@ -109,8 +91,10 @@ export default function MembershipSection({ user, membership: initialMembership,
       setLocalAutoRenewalRequest(true); // Update local state immediately
       queryClient.invalidateQueries({ queryKey: ['hubspotDashboardData', user.id] });
       toast({
-        title: "Auto-renewal enabled",
-        description: "Thank you for updating your renewal settings. Your membership will now auto-renew.",
+        title: "Request received",
+        description: hasStoredPaymentInfo
+          ? "Thank you for your request. Auto-renewal will be enabled for your next renewal."
+          : "Thank you for your interest. Auto-renewal will be enabled after you make your next payment.",
       });
     },
     onError: (error) => {
@@ -136,9 +120,6 @@ export default function MembershipSection({ user, membership: initialMembership,
   const activeSubscription = subscriptions?.find(
     (s) => s.status === 'active' || s.status === 'past_due'
   ) ?? null;
-
-  // A stored payment method is inferred from having any subscription record at all
-  const hasStoredPaymentMethod = (subscriptions?.length ?? 0) > 0;
 
   // Cancel/disable auto-renewal mutation
   const cancelMutation = useMutation({
@@ -183,7 +164,7 @@ export default function MembershipSection({ user, membership: initialMembership,
   // Sync local auto-renewal state with HubSpot data
   React.useEffect(() => {
     const autoRenewalRequestValue = hubSpotData?.contact?.auto_renewal_request;
-    if (autoRenewalRequestValue === true || autoRenewalRequestValue === "true") {
+    if (parseHubSpotCheckbox(autoRenewalRequestValue)) {
       setLocalAutoRenewalRequest(true);
     }
   }, [hubSpotData?.contact?.auto_renewal_request]);
@@ -430,7 +411,7 @@ export default function MembershipSection({ user, membership: initialMembership,
       </CardHeader>
       <CardContent className="p-6 pt-2">
         {/* Renewal Notice - only show amber alert when expiring and no auto-renewal set up */}
-        {!HIDE_RENEWAL_UI && renewalNeeded && !activeSubscription && !isAutoRenewalEnabled() && (
+        {!HIDE_RENEWAL_UI && renewalNeeded && !isCurrentlyOnAutoRenewal && !hasRequestedAutoRenewal && (
           <Alert className="mb-6 border-amber-200 bg-amber-50">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
             <AlertDescription className="text-amber-700">
@@ -447,7 +428,7 @@ export default function MembershipSection({ user, membership: initialMembership,
         )}
 
         {/* Auto-Renewal Confirmation Message — active subscription or legacy flag, expiring soon */}
-        {!HIDE_RENEWAL_UI && renewalNeeded && (activeSubscription || isAutoRenewalEnabled()) && (
+        {!HIDE_RENEWAL_UI && renewalNeeded && isCurrentlyOnAutoRenewal && (
           <Alert className="mb-6 border-green-200 bg-green-50">
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertDescription className="text-green-700">
@@ -466,27 +447,27 @@ export default function MembershipSection({ user, membership: initialMembership,
             {/* --- Active subscription panel --- */}
             {isLoadingSubscriptions ? (
               <Skeleton className="h-24 w-full rounded-lg" />
-            ) : activeSubscription ? (
+            ) : isCurrentlyOnAutoRenewal ? (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex items-start space-x-3">
                   <RefreshCw className="h-5 w-5 mt-0.5 text-green-600 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                       <h4 className="font-semibold text-secondary">
-                        {activeSubscription.name ?? 'Membership Subscription'}
+                        {activeSubscription?.name ?? 'Membership Subscription'}
                       </h4>
                       <Badge
                         className={
-                          activeSubscription.status === 'active'
+                          activeSubscription?.status === 'active'
                             ? 'bg-green-100 text-green-700 border-green-300'
                             : 'bg-amber-100 text-amber-700 border-amber-300'
                         }
                       >
-                        {activeSubscription.status === 'active' ? 'Active' : 'Past Due'}
+                        {activeSubscription?.status === 'active' ? 'Active' : activeSubscription?.status === 'past_due' ? 'Past Due' : 'Active'}
                       </Badge>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                      {activeSubscription.nextPaymentDate && (
+                      {activeSubscription?.nextPaymentDate && (
                         <div>
                           <p className="text-xs text-muted-foreground mb-0.5">Next Billing Date</p>
                           <p className="font-medium text-secondary">
@@ -494,7 +475,7 @@ export default function MembershipSection({ user, membership: initialMembership,
                           </p>
                         </div>
                       )}
-                      {activeSubscription.lastPaymentAmount != null && (
+                      {activeSubscription?.lastPaymentAmount != null && (
                         <div>
                           <p className="text-xs text-muted-foreground mb-0.5">Amount</p>
                           <p className="font-medium text-secondary">
@@ -505,7 +486,7 @@ export default function MembershipSection({ user, membership: initialMembership,
                           </p>
                         </div>
                       )}
-                      {activeSubscription.billingFrequency && (
+                      {activeSubscription?.billingFrequency && (
                         <div>
                           <p className="text-xs text-muted-foreground mb-0.5">Frequency</p>
                           <p className="font-medium text-secondary capitalize">
@@ -521,6 +502,7 @@ export default function MembershipSection({ user, membership: initialMembership,
                       </div>
                       <button
                         onClick={() => setShowPreferencesDialog(true)}
+                        disabled={!activeSubscription}
                         className="text-xs text-muted-foreground/60 hover:text-muted-foreground underline underline-offset-2 decoration-dotted transition-colors"
                       >
                         Manage preferences
@@ -533,22 +515,23 @@ export default function MembershipSection({ user, membership: initialMembership,
               /* --- No active subscription panel --- */
               <div className="bg-muted rounded-lg p-4">
                 <div className="flex items-start space-x-3">
-                  <RefreshCw className={`h-5 w-5 mt-0.5 ${isAutoRenewalEnabled() ? 'text-green-600' : 'text-muted-foreground'} flex-shrink-0`} />
+                  <RefreshCw className={`h-5 w-5 mt-0.5 ${hasRequestedAutoRenewal ? 'text-green-600' : 'text-muted-foreground'} flex-shrink-0`} />
                   <div className="flex-1">
                     <h4 className="font-semibold text-secondary mb-1">Auto-Renewal</h4>
-                    {isAutoRenewalEnabled() ? (
+                    {hasRequestedAutoRenewal ? (
                       /* Request already submitted — awaiting payment method */
                       <div className="space-y-2">
                         <p className="text-sm text-muted-foreground">
-                          Your auto-renewal preference has been noted. Auto-renewal will be
-                          activated when you complete your next membership payment.
+                          {hasStoredPaymentInfo
+                            ? "Thank you for your request. Auto-renewal will be enabled for your next renewal."
+                            : "Thank you for your interest. Auto-renewal will be enabled after you make your next payment."}
                         </p>
                         <div className="flex items-center space-x-2 text-green-600">
                           <Check className="h-4 w-4" />
                           <span className="text-sm font-medium">Request received</span>
                         </div>
                       </div>
-                    ) : hasStoredPaymentMethod ? (
+                    ) : hasStoredPaymentInfo ? (
                       /* Has a payment method — full enable flow */
                       <div className="space-y-3">
                         <p className="text-sm text-muted-foreground">
@@ -568,7 +551,7 @@ export default function MembershipSection({ user, membership: initialMembership,
                           ) : (
                             <>
                               <RefreshCw className="h-4 w-4 mr-2" />
-                              Enable Auto-Renewal
+                              Request Auto-Renewal
                             </>
                           )}
                         </Button>
@@ -582,8 +565,8 @@ export default function MembershipSection({ user, membership: initialMembership,
                         <div className="flex items-start space-x-2 text-muted-foreground bg-background rounded p-3 border border-border">
                           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
                           <p className="text-xs">
-                            Auto-renewal requires a payment method on file. Your card will be
-                            saved automatically when you complete your next renewal payment.
+                            Auto-renewal requires stored payment information. It can be enabled
+                            after you complete your next membership payment.
                           </p>
                         </div>
                         <Button
@@ -855,6 +838,3 @@ export default function MembershipSection({ user, membership: initialMembership,
     </Card>
   );
 }
-
-// Need to import React for React.useEffect
-import React from 'react';

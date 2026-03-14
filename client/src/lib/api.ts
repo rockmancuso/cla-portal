@@ -11,8 +11,9 @@ export interface HubSpotContactData {
   email?: string;
   firstName?: string;
   lastName?: string;
-  auto_renewing_?: boolean | string | null;
+  on_auto_renewal?: boolean | string | null;
   auto_renewal_request?: boolean | string | null;
+  has_stored_payment_info?: boolean | string | null;
 }
 
 export interface HubSpotSubscriptionData {
@@ -182,8 +183,9 @@ export async function getHubSpotDashboardData(): Promise<HubSpotDashboardData> {
         firstName: 'Demo',
         lastName: 'User',
         // 🧪 AUTO-RENEWAL TEST - Change this to test auto-renewal scenarios:
-        auto_renewing_: false, // Set to true, "true", or "Yes" to test auto-renewal enabled
+        on_auto_renewal: false, // Set to true, "true", or "Yes" to test active auto-renewal
         auto_renewal_request: false, // Mock: no request submitted
+        has_stored_payment_info: false, // Set to true to test immediate eligibility
       },
       company: {
         name: 'Demo Company',
@@ -202,8 +204,9 @@ export async function getHubSpotDashboardData(): Promise<HubSpotDashboardData> {
       email: hubspotData.memberEmail,
       firstName: hubspotData.firstName,
       lastName: hubspotData.lastName,
-      auto_renewing_: hubspotData.autoRenewing || null,
+      on_auto_renewal: hubspotData.onAutoRenewal ?? hubspotData.on_auto_renewal ?? null,
       auto_renewal_request: hubspotData.autoRenewingRequest || null,
+      has_stored_payment_info: hubspotData.hasStoredPaymentInfo ?? hubspotData.has_stored_payment_info ?? null,
     },
     company: {
       name: hubspotData.companyName || null,

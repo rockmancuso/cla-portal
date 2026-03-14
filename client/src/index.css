@@ -44,7 +44,7 @@
   --radius: 0.5rem;
 
   /* CLA Font Families */
-  --font-primary: figtree, -apple-system, BlinkMacSystemFont, "Segoe UI", Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  --font-primary: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
   --font-secondary: aktiv-grotesk, -apple-system, BlinkMacSystemFont, "Segoe UI", Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
 }
 
@@ -142,6 +142,7 @@
     font-family: var(--font-secondary) !important;
     font-weight: 600 !important;
     line-height: 1.2 !important;
+    padding-bottom: 0 !important;
   }
 
   #react-app-root p {

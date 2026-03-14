@@ -1,215 +1,306 @@
-# CLA HubSpot Member Portal
+# CLA Member Portal
 
-A member portal application with HubSpot and Eventbrite integration.
+React/Vite single-page application for authenticated CLA members. The portal is embedded in the CLA HubSpot member experience and surfaces membership data, renewal status, profile management, support links, and event activity sourced from HubSpot, WordPress, and the Eventbrite sync pipeline.
 
-## Features
+## What the Portal Does
 
-- Member dashboard with HubSpot data integration
-- Eventbrite events display (organization events)
-- HubSpot custom object integration for user event registrations
-- Responsive design with Tailwind CSS
+- Authenticates users through HubSpot CMS membership access. If a visitor can load the protected page and `window.hubspotPageData` is present, the SPA treats them as signed in.
+- Shows a personalized dashboard with membership status, paid-through date, current term start, and member-since date.
+- Differentiates active members from non-members using HubSpot `member_status`.
+- Lets members update profile/contact details directly in HubSpot.
+- Shows each member's registered events from HubSpot custom objects synced from Eventbrite.
+- Shows upcoming public CLA events from WordPress / The Events Calendar.
+- Links users directly to the canonical WordPress event page instead of keeping Eventbrite as the primary destination.
+- Provides membership support shortcuts and links into the broader CLA member site.
 
-## Environment Configuration
+## Recent Updates
 
-Copy `.env.example` to `.env` and configure the following variables:
+### Auto-Renewal and Membership Billing
 
-### Eventbrite API
-- `VITE_EVENTBRITE_PRIVATE_TOKEN`: Your Eventbrite private API token
-- `VITE_EVENTBRITE_ORGANIZATION_ID`: Your Eventbrite organization ID
+Recent changes expanded membership renewal handling from a simple reminder into a fuller HubSpot-backed auto-renewal experience:
 
-### HubSpot API
-- User eventbrite registrations are now fetched via AWS API Gateway (no frontend environment variables needed)
-- Organization events continue to use direct Eventbrite API calls
+- The UI now reads three HubSpot-backed renewal signals:
+  - `on_auto_renewal`
+  - `auto_renewal_request`
+  - `has_stored_payment_info`
+- Members with an active subscription see subscription details including status, next billing date, amount, and billing frequency.
+- Members without auto-renewal can submit an auto-renewal request directly from the portal.
+- If payment information is not yet stored, the portal still accepts the request and explains that auto-renewal will activate after the next payment.
+- Members with active auto-renewal can open a preferences dialog and cancel the HubSpot subscription at the next renewal date.
+- Renewal messaging now changes based on real state:
+  - expiring soon and not enrolled
+  - expiring soon and already on auto-renewal
+  - request submitted but pending activation
 
-## HubSpot Integration
+Important deployment note:
 
-### Eventbrite Registrations Custom Object
+- Renewal UI is controlled by `VITE_HIDE_RENEWAL_UI`.
+- The current `deploy.sh` builds production with `VITE_HIDE_RENEWAL_UI=true`, so renewal controls are currently suppressed unless that build behavior is changed.
 
-The application integrates with a HubSpot custom object called "eventbrite_registrations" to display user-specific event registrations.
+### Enhanced Events Integration
 
-**Custom Object Details:**
-- Internal name: `eventbrite_registrations`
-- Object type ID: `2-43504117`
-- Association type ID: `95` (contact_to_eventbrite_registrations)
+The events area was significantly reworked:
 
-**Required Properties:**
-- `event_name`: Name of the event
-- `registration_date`: Date of registration
-- `eb_attendee_email`: Email of the attendee (used for matching)
-- `attendee_number`: Unique attendee identifier
-- `event_start_date`: Event start date
-- `event_end_date`: Event end date
-- `event_url`: Link to the event
-- `event_description`: Event description
-- `event_location`: Event location
-- `venue_name`: Venue name
-- `is_free`: Whether the event is free
-- `event_status`: Event status
+- Upcoming events now come from WordPress / The Events Calendar REST API, not directly from Eventbrite.
+- The portal filters to events in the next 3 months and shows up to 5 in the dashboard.
+- Registered events still come from HubSpot custom object records populated by the Eventbrite sync Lambda.
+- Registration cards now prefer `wordpress_event_url` and otherwise fall back to `event_url`, so users are sent straight to the WordPress event page whenever a mapped WP event exists.
+- The Eventbrite sync Lambda now looks up the matching WordPress event URL and writes it back into HubSpot registration records.
+- Registration cards include richer synced metadata such as status, ticket type, order date, attendee IDs, and canonical event URLs.
+- Cancelled and refunded registrations are visually distinguished in the UI.
 
-### API Functions
+## Functional Overview
 
-The following functions have been implemented in `client/src/lib/api.ts`:
+### Dashboard Experience
 
-1. **`getHubSpotEventbriteRegistrations(contactId: string)`**
-   - Queries the AWS API Gateway endpoint for eventbrite_registrations associated with a contact
-   - Uses AWS API Gateway URL: `https://m7kj8ek8n3.execute-api.us-east-1.amazonaws.com/prod`
-   - Avoids CORS issues by using server-side proxy to HubSpot API
-   - Returns processed registration data from the backend
+- Hero section with profile update and sign-out actions.
+- Summary cards for:
+  - membership status
+  - paid through
+  - current term start
+  - member since
+- Priority membership state messaging based on expiration timing.
+- Separate member and non-member experiences.
 
-2. **`getMyRegisteredEventbriteEventsFromHubSpot()`**
-   - Gets the current user's contact ID from HubSpot personalization tokens
-   - Fetches associated registrations and transforms them to match the existing `EventbriteEventData` interface
-   - Filters registrations by user email for security
+### Membership Section
 
-3. **`getMyRegisteredEventbriteEvents()`** (Updated)
-   - Now calls the HubSpot integration instead of the Eventbrite API
-   - Maintains the same interface for frontend compatibility
+- Active members see:
+  - membership type
+  - member since
+  - company name
+  - renewal information from HubSpot
+  - auto-renewal/subscription controls when enabled
+- Non-members see:
+  - join CTA
+  - benefits overview
+  - links to join and review benefits
+- Membership health is derived from `membership_paid_through__c`.
+- Active member detection uses a strict allowlist in code: HubSpot `member_status = current`.
 
+### Profile Editing
 
----
+The profile modal updates HubSpot contact properties directly through the proxy API.
 
-## 🌐 High‑Level Architecture
+Supported fields include:
 
-| Layer              | Service / Technology                          | Purpose                                                                      |
-| ------------------ | --------------------------------------------- | ---------------------------------------------------------------------------- |
-| **Client**         | React (Vite + TS) · Tailwind · TanStack Query | Renders SPA, manages state, calls APIs.                                      |
-| **Static Hosting** | S3 + CloudFront (OAI)                         | Global asset delivery with edge‑cached bundles.                              |
-| **API Gateway**    | REST API (`tvs4suqkuh`)                       | Public entry‑point – forwards `/crm/*` to Lambda, injects CORS headers.      |
-| **Lambda**         | `hubspot-proxy` (Node 18)                     | Signs outbound HubSpot requests with **private‑app token** and returns JSON. |
-| **3rd‑Party APIs** | HubSpot · Eventbrite                          | Source of truth for contact, company and org‑wide event data.                |
+- first name
+- last name
+- email
+- total laundries
+- work phone
+- mobile phone
+- SMS consent
+- address
+- address line 2
+- city
+- country
+- state / province
+- postal code
 
+### Events Area
+
+- `My Registered Events`
+  - Loaded from HubSpot custom object `p19544225_eventbrite_registrations`
+  - Queried by contact email -> contact ID -> registration associations -> batch read
+  - Displays status badges such as Registered, Attended, Cancelled, and Refunded
+- `Upcoming Events`
+  - Loaded from WordPress `wp-json/tribe/events/v1/events`
+  - Uses WordPress as the canonical event source for the public events list
+- `View All Events`
+  - Opens `https://laundryassociation.org/events/`
+
+### Navigation and Support
+
+- Member content nav links to CLA pages like profile, store, resources, CLAdvantage Rewards, and CLA Business Solutions.
+- Quick Support card includes:
+  - email support
+  - call support
+  - subscription preferences
+
+## Architecture
+
+### Frontend
+
+- React 18
+- TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui primitives
+- TanStack Query
+
+### Primary Data Sources
+
+- HubSpot personalization tokens via `window.hubspotPageData`
+- HubSpot CRM API through AWS API Gateway + Lambda proxy
+- WordPress / The Events Calendar REST API
+- Eventbrite API, primarily through the sync Lambda
+
+### Supporting AWS Components
+
+- S3 for static hosting
+- CloudFront for CDN delivery
+- API Gateway for HubSpot proxy and Eventbrite webhook entrypoint
+- `hubspot-proxy` Lambda for HubSpot API access
+- `eventbrite-sync` Lambda for Eventbrite -> HubSpot synchronization and nightly reconciliation
+
+## Integration Details
+
+### HubSpot
+
+HubSpot is the source of truth for:
+
+- member identity in the protected CMS context
+- membership fields
+- company fields
+- profile updates
+- subscription records
+- synced registration custom objects
+
+Core contact fields currently used by the portal:
+
+- `membership_type`
+- `membership_paid_through__c`
+- `current_term_start_date__c`
+- `member_status`
+- `activated_date__c`
+- `on_auto_renewal`
+- `auto_renewal_request`
+- `has_stored_payment_info`
+
+### WordPress Events API
+
+The portal reads upcoming events from:
+
+- `https://laundryassociation.org/wp-json/tribe/events/v1/events`
+
+Expected event data includes:
+
+- title
+- canonical WordPress URL
+- start/end dates
+- venue
+- organizer
+- categories
+- optional mapped Eventbrite ID
+
+### Eventbrite Sync Lambda
+
+`eventbrite-sync/index.js` handles:
+
+- Eventbrite webhooks:
+  - `order.placed`
+  - `order.updated`
+  - `order.refunded`
+  - `attendee.updated`
+  - `event.updated`
+- nightly reconciliation via EventBridge
+- upserting HubSpot custom object registrations
+- matching registrations to HubSpot contacts by attendee email
+- enriching records with ticket/order metadata
+- resolving and persisting `wordpress_event_url`
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 18+
+- npm
+
+### Install
+
+```bash
+npm install
 ```
- Browser ─▶ CloudFront ─▶ S3 (static)
-            ║
-            ╚═▶ /crm/* ─▶ API Gateway ─▶ Lambda  ─▶ HubSpot API
-                               │
-                               └──────────────▶ Eventbrite Public API
+
+### Run
+
+```bash
+npm run dev
 ```
 
-* **Auth model** – HubSpot CMS handles login. If a visitor can load the page they are an authenticated contact.
-* **Data sourcing** – Basic contact/company fields via `window.hubspotPageData`; anything private (custom objects, writes) goes through the proxy.
+The app runs with Vite and will use mock/fallback data when HubSpot CMS context is unavailable.
 
----
+### Type Check
 
-## Current Capabilities
+```bash
+npm run check
+```
 
-### Dashboard
+## Environment Variables
 
-* **Profile, Membership, Company** cards populated from HubSpot personalisation tokens.
-* **My Events**  ⟶ lists Eventbrite registrations via the custom object ↔ contact association.
-* **Org Events** ⟶ pulls upcoming public events directly from Eventbrite.
-
-### Edit Profile (in‑progress)
-
-* Modal form (`ProfileEditModal`) lets members update Firstname, Lastname, phones, address, etc.
-* Uses new helper `updateUserProfile(contactId, properties)`  → PATCH via Lambda to HubSpot.
-* Local + admin testing supported via `?email=test@example.com` URL param (dev or admin only).
-
-### Dev Quality‑of‑Life
-
-* **Vite Hot Reload** with Tailwind JIT.
-* Mock fallbacks for Eventbrite + HubSpot so the SPA boots with no secrets in local dev.
-* One‑command deploy: `deploy.sh` (build → sync to S3 → invalidate CloudFront).
-
----
-
-## 💾 Environment Variables (`.env`)
+Frontend variables:
 
 ```env
-# Eventbrite
-VITE_EVENTBRITE_PRIVATE_TOKEN=
-VITE_EVENTBRITE_ORGANIZATION_ID=
-
-# AWS / Proxy
 VITE_API_GATEWAY_URL=https://tvs4suqkuh.execute-api.us-east-1.amazonaws.com/prod
-
-# Local testing helpers
-VITE_DEFAULT_TEST_EMAIL=test@example.com  # optional – used when ?email= not supplied
+VITE_WP_API_BASE=https://laundryassociation.org/wp-json
+VITE_EVENTBRITE_PRIVATE_TOKEN=
+VITE_EVENTBRITE_ORGANIZATION_ID=2140213592673
+VITE_HIDE_RENEWAL_UI=false
 ```
 
-*No HubSpot secret is exposed to the browser – it lives as `HUBSPOT_ACCESS_TOKEN` in the Lambda environment.*
+Notes:
 
-### UI Feature Flags
+- `VITE_API_GATEWAY_URL` is required for HubSpot proxy calls.
+- `VITE_WP_API_BASE` controls the WordPress events source.
+- Direct Eventbrite frontend access is now legacy/backward-compatibility behavior; WordPress is the primary source for upcoming events.
+- `VITE_HIDE_RENEWAL_UI` is a build-time feature flag.
 
-- `VITE_HIDE_RENEWAL_UI` (default: not set)
-  - When set to `true`, hides all membership renewal and auto‑renewal notices/buttons in the UI.
-  - This is a build‑time flag (Vite). Make sure it is set in the environment for the client build.
+Lambda-side variables:
 
-Examples:
+### `hubspot-proxy`
 
-```bash
-# Local dev (one‑off)
-VITE_HIDE_RENEWAL_UI=true pnpm dev
+- `HUBSPOT_ACCESS_TOKEN`
 
-# Local dev (persistent)
-echo "VITE_HIDE_RENEWAL_UI=true" >> client/.env.local
+### `eventbrite-sync`
 
-# CI / deploy build (inline)
-VITE_HIDE_RENEWAL_UI=true pnpm build
+- `HUBSPOT_ACCESS_TOKEN`
+- `EVENTBRITE_TOKEN`
+- `WEBHOOK_SECRET`
+- `WP_API_BASE`
+- `EVENTBRITE_ORG_ID`
+- `EB_CUSTOM_Q_COMPANY`
+- `EB_CUSTOM_Q_MOBILE`
+- `EB_CUSTOM_Q_ADDRESS`
+- `EB_CUSTOM_Q_INDIV_TYPE`
 
-# Our deploy script usage (inside deploy.sh)
-VITE_HIDE_RENEWAL_UI=true npx vite build
-```
+## Deployment
 
----
+### Frontend
 
-## 🗂️ Code Map (client/src)
+`deploy.sh` currently:
 
-| Path                                | Notes                                                          |
-| ----------------------------------- | -------------------------------------------------------------- |
-| `main.tsx`                          | React root – adds `QueryClientProvider` + Router.              |
-| `pages/dashboard.tsx`               | Shell layout & card composition.                               |
-| `components/events-section.tsx`     | Org events + My registrations sub‑sections.                    |
-| `components/profile-edit-modal.tsx` | Inline edit modal (uses `updateUserProfile`).                  |
-| `hooks/use-registrations.ts`        | React‑Query hook; respects `?email=` override.                 |
-| `lib/api.ts`                        | **All** remote I/O – Eventbrite, proxy’d HubSpot reads/writes. |
+1. deletes the previous `dist/`
+2. builds the app with Vite
+3. syncs the built assets to `s3://cla-member-portal/`
+4. invalidates CloudFront distribution `E3EFOG0IGJZ6AI`
+5. optionally updates the `hubspot-proxy` Lambda zip
 
----
+Current caveat:
 
-## 🔄 Data Flow – *My Registered Events*
+- The script uses `VITE_HIDE_RENEWAL_UI=true npx vite build`, so production deploys from this script hide renewal UI unless the script is changed.
 
-1. **Contact email** read from `hubspotPageData` **or** `?email=` override.
-2. `useRegistrations` → `getHubSpotEventbriteRegistrations(contactId)`
-3. API Gateway `/crm/v3/objects/contacts/{id}` `?associations=eventbrite_registrations`
-4. Lambda adds auth header → HubSpot returns custom object records.
-5. Client maps to `EventbriteEventData` → renders in Events section.
+### Infrastructure Templates
 
----
+- `hubspot-proxy.yaml`
+- `eventbrite-sync.yaml`
 
-## 🚧 In‑Progress / Backlog
+These define the proxy Lambda/API Gateway resources and the Eventbrite sync Lambda/webhook/reconciliation resources.
 
-| ID             | Task                                                                   | Status                                                |
-| -------------- | ---------------------------------------------------------------------- | ----------------------------------------------------- |
-| **#EP‑1**      | **Finish Edit Profile** (PATCH contact + validation + success banner)  | 70% – PATCH works, need full field list and UI polish |
-| **#EV‑cache**  | Cache org‑wide Eventbrite list in Edge @ CloudFront to cut cold starts | Not started                                           |
-| **#Analytics** | Add PostHog for portal usage metrics                                   | Not started – blocked on budget OK                    |
-| **#Docs**      | Keep README synced with infra/code – this doc                          | **✅ Up to date (Jun 16 2025)**                        |
+## Important Files
 
----
+- `client/src/pages/dashboard.tsx` - main portal shell
+- `client/src/components/membership-section.tsx` - membership, renewal, and auto-renewal UI
+- `client/src/components/events-section.tsx` - upcoming WordPress events
+- `client/src/components/registrations-section.tsx` - member registrations from HubSpot sync records
+- `client/src/components/profile-edit-modal.tsx` - profile editing modal
+- `client/src/lib/api.ts` - all frontend API and data-mapping logic
+- `client/src/lib/utils.ts` - member status and HubSpot checkbox parsing helpers
+- `hubspot-proxy/index.js` - HubSpot API proxy Lambda
+- `eventbrite-sync/index.js` - Eventbrite sync and reconciliation Lambda
 
-## 🛠  Running Locally
+## Current Caveats
 
-```bash
-pnpm install          # or npm / yarn
-pnpm dev              # http://localhost:5173
-
-# test another user
-open "http://localhost:5173?email=someone@laundryassociation.org"
-```
-
----
-
-## 🚀 Deployment Workflow
-
-1. `pnpm build` – Vite → `/dist`
-2. `./deploy.sh` – Upload to S3, invalidate CloudFront.
-3. Lambda + API Gateway are pre‑packaged in `hubspot-proxy.yaml` (SAM).
-   `sam deploy --guided` when infra changes.
-
----
-
-### Contributors / Contact
-
-* Rob (@rockmancuso) – Front‑end & AWS
-* CLA Staff – Domain experts, data mapping
-* PRs welcome → open an issue first for discussion.
+- `handleRenewal()` in the membership UI is still a placeholder, so the reminder CTA does not yet launch a real renewal checkout flow.
+- The renewal UI may be intentionally hidden in production depending on the build flag.
+- Some local-dev behavior uses mock data when HubSpot personalization tokens are absent.
+- Legacy Eventbrite API helpers remain in the codebase for compatibility, but WordPress is now the intended source for upcoming event display.
